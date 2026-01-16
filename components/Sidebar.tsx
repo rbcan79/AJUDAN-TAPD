@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { 
   LayoutDashboard, Users, Database, LogOut, 
-  Menu, ChevronLeft, Shield, ClipboardCheck, Settings, BookOpen 
+  Menu, ChevronLeft, Shield, ClipboardCheck, Settings, BookOpen, Search
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -53,9 +53,11 @@ export default function Sidebar() {
     return () => subscription.unsubscribe();
   }, [router]);
 
+  // BAGIAN YANG DIUPDATE: Menambahkan CEK DATA dengan hak akses admin & superadmin
   const allMenuItems = [
     { name: "DASHBOARD", path: "/", icon: <LayoutDashboard size={20} />, roles: ["superadmin", "ADMIN", "TAPD", "SKPD (OPD)"] },
     { name: "USER MANAGEMENT", path: "/register", icon: <Users size={20} />, roles: ["superadmin", "ADMIN"] },
+    { name: "CEK DATA", path: "/cek-data", icon: <Search size={20} />, roles: ["superadmin", "ADMIN"] }, // Baris Baru
     { name: "USULAN KEGIATAN", path: "/usulan", icon: <Database size={20} />, roles: ["superadmin", "SKPD (OPD)"] },
     { name: "ASISTENSI TAPD", path: "/asistensi", icon: <ClipboardCheck size={20} />, roles: ["superadmin", "TAPD"] },
     { name: "PENGESAHAN USULAN", path: "/pengesahan", icon: <BookOpen size={20} />, roles: ["superadmin", "ADMIN"] },
@@ -70,11 +72,10 @@ export default function Sidebar() {
   return (
     <div className={`bg-[#002855] min-h-screen text-white transition-all duration-300 flex flex-col h-screen sticky top-0 ${isCollapsed ? "w-20" : "w-64"}`}>
       
-      {/* HEADER: UPDATE FOTO PRIA BERJAS SESUAI LAMPIRAN */}
+      {/* HEADER: TETAP SESUAI FOTO PRIA BERJAS */}
       <div className="p-4 border-b border-blue-900/50 flex items-center justify-between bg-[#001e40]">
         {!isCollapsed && (
           <div className="flex items-center gap-3">
-            {/* Foto Pria Berjas dari folder public */}
             <div className="w-10 h-10 rounded-full border-2 border-blue-400 overflow-hidden shrink-0 shadow-lg bg-white">
               <img 
                 src="/ajudan-pria.png" 
@@ -97,7 +98,7 @@ export default function Sidebar() {
         </button>
       </div>
 
-      {/* PROFIL LOGIN */}
+      {/* PROFIL LOGIN: TETAP */}
       <div className={`p-4 border-b border-blue-900/50 flex items-center gap-3 bg-[#002855]/50 ${isCollapsed ? "justify-center" : ""}`}>
         <div className="relative shrink-0">
           <div className="w-10 h-10 rounded-full border-2 border-blue-400 overflow-hidden bg-white shadow-xl flex items-center justify-center">
@@ -119,7 +120,7 @@ export default function Sidebar() {
         )}
       </div>
       
-      {/* NAVIGASI MENU */}
+      {/* NAVIGASI MENU: TETAP */}
       <nav className="flex-1 p-3 space-y-1.5 mt-2 overflow-y-auto">
         {filteredMenus.map((item) => (
           <Link 
@@ -135,7 +136,7 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* TOMBOL KELUAR - BERSIH TOTAL & LAYER PALING ATAS */}
+      {/* TOMBOL KELUAR: TETAP */}
       <div className="p-3 border-t border-blue-900/50 bg-[#001e40] relative z-[9999]">
         <button 
           onClick={async () => { 
