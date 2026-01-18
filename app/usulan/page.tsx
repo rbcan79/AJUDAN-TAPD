@@ -49,14 +49,12 @@ export default function UsulanPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // 1. Ambil Profil User
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
       if (profile) {
         setCurrentUser(profile);
         setKdSkpd(profile.kd_skpd);
       }
 
-      // 2. Ambil Status Anggaran yang sedang TRUE (Locked)
       const { data: settingsData } = await supabase.from("settings").select("*").order("id", { ascending: true });
       setStatusOptions(settingsData || []);
       
@@ -64,11 +62,9 @@ export default function UsulanPage() {
       const activeStatus = activeSetting?.current_status_anggaran || "";
       setStatusAnggaranAktif(activeStatus);
 
-      // 3. Ambil Data SKPD
       const { data: skpdData } = await supabase.from("skpd").select("kode, nama").order("kode", { ascending: true });
       if (skpdData) setListSkpd(skpdData);
 
-      // 4. Ambil Data Usulan FILTER: Status Anggaran Aktif DAN KD_SKPD User
       if (activeStatus && profile) {
         let query = supabase
           .from("usulan")
@@ -76,7 +72,6 @@ export default function UsulanPage() {
           .eq("status_anggaran", activeStatus)
           .order("created_at", { ascending: false });
 
-        // Jika bukan Superadmin/Admin, filter hanya milik SKPD-nya
         if (profile.role !== "superadmin" && profile.role !== "ADMIN") {
           query = query.eq("kd_skpd", profile.kd_skpd);
         }
@@ -208,7 +203,7 @@ export default function UsulanPage() {
 
         <div className="flex items-center gap-2">
           <div className="bg-white p-1 rounded-sm border border-slate-200 flex items-center gap-2">
-            <span className="text-[8px] font-black text-slate-400 uppercase px-2 flex items-center gap-1"><Filter size={10}/> STATUS AKTIF:</span>
+            <span className="text-[8px] font-black text-slate-400 uppercase px-2 flex items-center gap-1"><Filter size={10}/> TAHAP AKTIF:</span>
             <select 
               disabled
               value={statusAnggaranAktif}
@@ -226,7 +221,7 @@ export default function UsulanPage() {
       </div>
 
       <div className="grid grid-cols-12 gap-4">
-        {/* FORM */}
+        {/* FORM SECTION */}
         <div className="col-span-12 lg:col-span-4">
           <div className={`bg-white border rounded-sm shadow-sm overflow-hidden ${isEditing ? 'border-orange-400' : 'border-slate-200'}`}>
             <div className={`${isEditing ? 'bg-orange-500' : 'bg-[#002855]'} p-2.5 text-white text-[10px] font-black uppercase italic flex justify-between`}>
@@ -237,7 +232,10 @@ export default function UsulanPage() {
               <input placeholder="NOMOR USULAN" value={noUsulan} onChange={e => setNoUsulan(e.target.value)} className="w-full p-2 border border-slate-200 font-bold uppercase outline-none focus:border-blue-500" required />
               <input placeholder="NAMA KEGIATAN" value={namaKegiatan} onChange={e => setNamaKegiatan(e.target.value)} className="w-full p-2 border border-slate-200 font-bold uppercase outline-none focus:border-blue-500" required />
               <textarea placeholder="NARASI USULAN" value={narasi} onChange={e => setNarasi(e.target.value)} className="w-full p-2 border border-slate-200 font-bold h-24 outline-none focus:border-blue-500" required />
-              <input type="text" value={displayAnggaran} onChange={(e) => setDisplayAnggaran(formatRupiah(e.target.value))} placeholder="Rp 0" className="w-full p-2 border border-slate-200 font-bold text-blue-700 bg-blue-50/30 outline-none" required />
+              <div className="space-y-1">
+                <label className="text-[8px] font-black text-slate-400 uppercase">Estimasi Anggaran (RAB)</label>
+                <input type="text" value={displayAnggaran} onChange={(e) => setDisplayAnggaran(formatRupiah(e.target.value))} placeholder="Rp 0" className="w-full p-2 border border-slate-200 font-bold text-blue-700 bg-blue-50/30 outline-none" required />
+              </div>
 
               <div className="grid grid-cols-3 gap-2">
                 <label className={`flex flex-col items-center p-2 border border-dashed rounded-sm cursor-pointer ${fileFoto ? "bg-green-50 border-green-500 text-green-600" : "border-slate-300 text-slate-400"}`}>
@@ -262,17 +260,17 @@ export default function UsulanPage() {
           </div>
         </div>
 
-        {/* TABEL */}
+        {/* TABLE SECTION */}
         <div className="col-span-12 lg:col-span-8 bg-white border border-slate-200 rounded-sm shadow-sm p-4 overflow-x-auto">
           <div className="mb-3 flex items-center justify-between border-b pb-2">
             <span className="text-[10px] font-black uppercase italic text-slate-500">Daftar Usulan Tahap {statusAnggaranAktif}</span>
-            <span className="text-[8px] font-bold text-slate-400">{usulanData.length} RECORD DITEMUKAN</span>
+            <span className="text-[8px] font-bold text-slate-400 tracking-widest">{usulanData.length} USULAN</span>
           </div>
           <table className="w-full text-left">
             <thead>
               <tr className="text-[9px] font-black text-slate-400 uppercase border-b border-slate-100 italic">
-                <th className="pb-3">Kegiatan & Nomor</th>
-                <th className="pb-3 text-center">Anggaran</th>
+                <th className="pb-3 w-1/3">Kegiatan & Nomor</th>
+                <th className="pb-3 text-right">Nominal RAB</th>
                 <th className="pb-3 text-center">Berkas</th>
                 <th className="pb-3 text-center">Status</th>
                 <th className="pb-3 text-center">Aksi</th>
@@ -281,7 +279,7 @@ export default function UsulanPage() {
             <tbody className="divide-y divide-slate-50">
               {usulanData.length === 0 ? (
                 <tr>
-                   <td colSpan={5} className="py-10 text-center text-slate-300 italic font-bold uppercase tracking-widest">Tidak ada data untuk tahap {statusAnggaranAktif}</td>
+                   <td colSpan={5} className="py-10 text-center text-slate-300 italic font-bold uppercase tracking-widest">Tidak ada data usulan untuk tahap {statusAnggaranAktif}</td>
                 </tr>
               ) : usulanData.map((item) => {
                 const isPengajuan = item.status?.toUpperCase() === 'PENGAJUAN';
@@ -289,29 +287,29 @@ export default function UsulanPage() {
                   <tr key={item.id} className="hover:bg-slate-50/50">
                     <td className="py-4">
                       <p className="font-black text-slate-800 uppercase leading-none">{item.nama_kegiatan}</p>
-                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tight mt-1.5">
-                        {item.nomor_usulan}
+                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-tight mt-1.5 flex items-center gap-1">
+                        <Tag size={8}/> {item.nomor_usulan}
                       </p>
                     </td>
-                    <td className="py-4 text-center font-bold text-blue-600">
+                    <td className="py-4 text-right font-black text-blue-700">
                         Rp {item.anggaran?.toLocaleString('id-ID')}
                     </td>
                     <td className="py-4 text-center">
                       <div className="flex justify-center gap-1.5">
-                        {item.file_foto_url && <button onClick={() => setPreviewUrl(item.file_foto_url)} className="p-1.5 text-orange-500 bg-orange-50 rounded-sm border border-orange-100"><Camera size={12}/></button>}
-                        {item.file_surat_url && <button onClick={() => setPreviewUrl(item.file_surat_url)} className="p-1.5 text-blue-500 bg-blue-50 rounded-sm border border-blue-100"><FileText size={12}/></button>}
-                        {item.file_rab && <button onClick={() => setPreviewUrl(item.file_rab)} className="p-1.5 text-green-600 bg-green-50 rounded-sm border border-green-100"><FileSpreadsheet size={12}/></button>}
+                        {item.file_foto_url && <button onClick={() => setPreviewUrl(item.file_foto_url)} className="p-1.5 text-orange-500 bg-orange-50 rounded-sm border border-orange-100 hover:bg-orange-100 transition-colors" title="Lihat Foto"><Camera size={12}/></button>}
+                        {item.file_surat_url && <button onClick={() => setPreviewUrl(item.file_surat_url)} className="p-1.5 text-blue-500 bg-blue-50 rounded-sm border border-blue-100 hover:bg-blue-100 transition-colors" title="Lihat Surat"><FileText size={12}/></button>}
+                        {item.file_rab && <button onClick={() => setPreviewUrl(item.file_rab)} className="p-1.5 text-green-600 bg-green-50 rounded-sm border border-green-100 hover:bg-green-100 transition-colors" title="Lihat RAB"><FileSpreadsheet size={12}/></button>}
                       </div>
                     </td>
                     <td className="py-4 text-center">
-                      <span className={`px-2 py-1 rounded-sm font-black uppercase text-[8px] border ${isPengajuan ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-green-50 text-green-600 border-green-100'}`}>
+                      <span className={`px-2 py-1 rounded-sm font-black uppercase text-[8px] border shadow-sm ${isPengajuan ? 'bg-orange-50 text-orange-600 border-orange-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
                         {item.status}
                       </span>
                     </td>
                     <td className="py-4 text-center">
                       <div className="flex justify-center gap-1">
-                        <button onClick={() => handleEdit(item)} disabled={!isPengajuan} className={`p-2 rounded-sm border ${isPengajuan ? 'text-slate-400 hover:text-orange-500 border-slate-100' : 'text-slate-200'}`}><Edit3 size={14} /></button>
-                        <button onClick={() => handleDelete(item.id, item.status)} disabled={!isPengajuan} className={`p-2 rounded-sm border ${isPengajuan ? 'text-slate-400 hover:text-red-500 border-slate-100' : 'text-slate-200'}`}><Trash2 size={14} /></button>
+                        <button onClick={() => handleEdit(item)} disabled={!isPengajuan} className={`p-2 rounded-sm border transition-all ${isPengajuan ? 'text-slate-400 hover:text-orange-500 hover:border-orange-200 border-slate-100' : 'text-slate-200 border-transparent cursor-not-allowed'}`} title="Edit"><Edit3 size={14} /></button>
+                        <button onClick={() => handleDelete(item.id, item.status)} disabled={!isPengajuan} className={`p-2 rounded-sm border transition-all ${isPengajuan ? 'text-slate-400 hover:text-red-500 hover:border-red-200 border-slate-100' : 'text-slate-200 border-transparent cursor-not-allowed'}`} title="Hapus"><Trash2 size={14} /></button>
                       </div>
                     </td>
                   </tr>
