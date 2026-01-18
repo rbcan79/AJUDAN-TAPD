@@ -122,7 +122,7 @@ export default function DashboardPage() {
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase border-b">
             <tr>
-              <th className="px-6 py-3 w-2/3">Unit Kerja / Nama Kegiatan</th>
+              <th className="px-6 py-3 w-2/3">SKPD / Nama Kegiatan</th>
               <th className="px-6 py-3 text-right">Anggaran (Rp)</th>
             </tr>
           </thead>
