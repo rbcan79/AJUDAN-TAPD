@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
   LayoutDashboard, ChevronRight, Folder, List, MessageSquare, AlertCircle, Loader2, Filter, CheckCircle2, XCircle 
@@ -15,63 +15,45 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchInitialData();
-  }, []);
-
-  useEffect(() => {
-    if (selectedStatus && profile) {
-      fetchUsulanAndAsistensi(profile, selectedStatus);
-    }
-  }, [selectedStatus, profile]);
-
-  const fetchInitialData = async () => {
+  const fetchUsulanAndAsistensi = useCallback(async (userProfile: any, statusFilter: string) => {
+    if (!statusFilter || !userProfile) return;
+    
     try {
-      setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Silakan login kembali.");
-
-      const { data: prof } = await supabase.from("profiles").select("*").eq("id", user.id).single();
-      setProfile(prof);
-
-      const { data: settingsData } = await supabase.from("settings").select("*").order("id", { ascending: true });
-      setStatusOptions(settingsData || []);
-
-      const activeStatus = settingsData?.find(s => s.is_locked === true);
-      setSelectedStatus(activeStatus?.current_status_anggaran || settingsData?.[0]?.current_status_anggaran || "");
-
-    } catch (err: any) {
-      setErrorMsg(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchUsulanAndAsistensi = async (userProfile: any, statusFilter: string) => {
-    try {
+      const filterValue = String(statusFilter).trim();
+      
+      // 1. Ambil data usulan tanpa join untuk menghindari error relasi
       let queryUsulan = supabase
         .from("usulan")
-        .select(`*, skpd:kd_skpd (nama)`) 
-        .eq("status_anggaran", statusFilter);
+        .select(`*`) 
+        .eq("status_anggaran", filterValue);
 
       if (userProfile.role === "SKPD (OPD)") {
         queryUsulan = queryUsulan.eq("kd_skpd", userProfile.kd_skpd);
       }
 
-      const { data: usulanData } = await queryUsulan;
+      const { data: usulanData, error: uErr } = await queryUsulan;
+      if (uErr) throw uErr;
 
       if (usulanData && usulanData.length > 0) {
+        // 2. Ambil referensi nama SKPD secara terpisah dari tabel skpd
+        const { data: skpdData } = await supabase.from("skpd").select("kode, nama");
+
+        // 3. Ambil data asistensi
         const usulanIds = usulanData.map(u => u.id);
         const { data: asistensiData } = await supabase
           .from("asistensi")
           .select("usulan_id, rekomendasi")
           .in("usulan_id", usulanIds);
 
-        const mergedData = usulanData.map(u => ({
-          ...u,
-          nama_skpd_label: u.skpd?.nama || "SKPD Tidak Terdaftar",
-          rekomendasi_tapd: asistensiData?.find(a => a.usulan_id === u.id)?.rekomendasi || null
-        }));
+        // 4. Gabungkan data secara manual di frontend
+        const mergedData = usulanData.map(u => {
+          const infoSkpd = skpdData?.find(s => s.kode === u.kd_skpd);
+          return {
+            ...u,
+            nama_skpd_label: infoSkpd?.nama || u.nama_skpd || "SKPD Tidak Terdaftar",
+            rekomendasi_tapd: asistensiData?.find(a => a.usulan_id === u.id)?.rekomendasi || null
+          };
+        });
 
         setAllUsulan(mergedData);
         setStats({
@@ -85,13 +67,44 @@ export default function DashboardPage() {
         setStats({ totalUsulan: 0, disetujui: 0, ditolak: 0, totalAnggaran: 0 });
       }
     } catch (err: any) {
-      console.error(err);
+      console.error("Fetch error:", err);
+      setErrorMsg("Gagal memuat data: " + err.message);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        setLoading(true);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("Silakan login kembali.");
+
+        const { data: prof } = await supabase.from("profiles").select("*").eq("id", user.id).single();
+        setProfile(prof);
+
+        const { data: settingsData } = await supabase.from("settings").select("*").order("id", { ascending: true });
+        setStatusOptions(settingsData || []);
+
+        const activeStatus = settingsData?.find(s => s.is_locked === true);
+        setSelectedStatus(activeStatus?.current_status_anggaran || settingsData?.[0]?.current_status_anggaran || "");
+
+      } catch (err: any) {
+        setErrorMsg(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInitialData();
+  }, []);
+
+  useEffect(() => {
+    if (selectedStatus && profile) {
+      fetchUsulanAndAsistensi(profile, selectedStatus);
+    }
+  }, [selectedStatus, profile, fetchUsulanAndAsistensi]);
 
   const renderTableSection = (isApproved: boolean) => {
     const filtered = allUsulan.filter(d => isApproved ? d.tanggal_pengesahan !== null : d.tanggal_pengesahan === null);
-    
     const grouped = filtered.reduce((acc: any, curr: any) => {
       const key = curr.kd_skpd || "NON-SKPD";
       if (!acc[key]) acc[key] = { nama: curr.nama_skpd_label, items: [], total: 0 };
@@ -129,7 +142,7 @@ export default function DashboardPage() {
                     <td className="px-6 py-4 text-right font-black text-slate-900 text-xs">
                         <div className="flex flex-col items-end">
                             <span>{grouped[kd].total.toLocaleString('id-ID')}</span>
-                            <span className="text-[8px] text-slate-400 font-bold">{grouped[kd].items.length} ITEM</span>
+                            <span className="text-[8px] text-slate-400 font-bold uppercase">{grouped[kd].items.length} ITEM</span>
                         </div>
                     </td>
                   </tr>
@@ -158,14 +171,13 @@ export default function DashboardPage() {
     );
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-blue-600" size={40} /></div>;
-
   return (
     <div className="p-6 bg-[#F8FAFC] min-h-screen font-sans">
+      {/* HEADER DAN FILTER TETAP SAMA */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tighter uppercase flex items-center gap-2">
-            <LayoutDashboard className="text-blue-600" /> DAFTAR PROSES USULAN
+            <LayoutDashboard className="text-blue-600" /> Monitor Realisasi Usulan
           </h1>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1 ml-8">Petugas: {profile?.nama_lengkap} | {profile?.role}</p>
         </div>
@@ -184,6 +196,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {errorMsg && <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg flex items-center gap-2 border border-red-200 text-xs font-bold uppercase"><AlertCircle size={16}/> {errorMsg}</div>}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
         <StatCard title="Total Disetujui" value={stats.disetujui} sub="ITEM" color="emerald" />
         <StatCard title="Belum Disetujui" value={stats.ditolak} sub="ITEM" color="rose" />
@@ -195,7 +209,6 @@ export default function DashboardPage() {
 
       {renderTableSection(true)}
       {renderTableSection(false)}
-
     </div>
   );
 }
@@ -205,7 +218,7 @@ function StatCard({ title, value, sub, color }: any) {
   return (
     <div className={`bg-white p-6 rounded-2xl border-b-4 ${baseColor} shadow-sm`}>
       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{title}</p>
-      <p className="text-2xl font-black mt-1">{value} <span className="text-xs text-slate-300 font-bold uppercase">{sub}</span></p>
+      <p className="text-2xl font-black mt-1 text-slate-900">{value} <span className="text-xs text-slate-300 font-bold uppercase">{sub}</span></p>
     </div>
   );
 }
