@@ -42,12 +42,14 @@ export default function RegisterPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      // Ambil data SKPD untuk dropdown
       const { data: skpdData } = await supabase
         .from("skpd")
         .select("kode, nama")
         .order("kode", { ascending: true });
       if (skpdData) setListSkpd(skpdData);
 
+      // Ambil profile user yang sedang login
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
       setCurrentUser(profile);
 
@@ -95,24 +97,36 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     try {
+      // 1. Create User di Auth Supabase
       const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
       if (authError) throw authError;
+
       if (authData.user) {
+        // Tentukan KD SKPD (Jika admin/superadmin biasanya akses global/ALL)
         const finalKdSkpd = (role === 'superadmin' || role === 'TAPD' || role === 'ADMIN') ? 'ALL' : kdSkpd;
-        await supabase.from("profiles").upsert({ 
+        
+        // 2. Insert ke tabel profiles (Menggunakan avatar_url sesuai gambar DB)
+        const { error: profileError } = await supabase.from("profiles").upsert({ 
           id: authData.user.id, 
           nama_lengkap: nama, 
           role, 
           email,
           kd_skpd: finalKdSkpd, 
-          avatars: avatarUrl 
+          avatar_url: avatarUrl // Disesuaikan dengan kolom DB Anda
         });
+
+        if (profileError) throw profileError;
+
         alert("Petugas Berhasil Didaftarkan");
+        // Reset Form
         setNama(""); setEmail(""); setPassword(""); setAvatarUrl(""); setKdSkpd("");
         fetchData();
       }
-    } catch (err: any) { alert(err.message); }
-    finally { setLoading(false); }
+    } catch (err: any) { 
+        alert(err.message); 
+    } finally { 
+        setLoading(false); 
+    }
   };
 
   const handleUpdate = async (id: string) => {
@@ -122,7 +136,7 @@ export default function RegisterPage() {
       const updateData: any = { 
         nama_lengkap: editNama, 
         email: editEmail,
-        avatars: editAvatar,
+        avatar_url: editAvatar, // Disesuaikan dengan kolom DB Anda
         kd_skpd: finalKdSkpd 
       };
       
@@ -131,6 +145,7 @@ export default function RegisterPage() {
       const { error: profileError } = await supabase.from("profiles").update(updateData).eq("id", id);
       if (profileError) throw profileError;
 
+      // Update password jika diisi
       if (editPassword) {
         const { error: pwdError } = await supabase.auth.updateUser({ password: editPassword });
         if (pwdError) throw pwdError;
@@ -141,8 +156,11 @@ export default function RegisterPage() {
       setShowEditPassword(false);
       alert("Data berhasil diperbarui");
       fetchData();
-    } catch (err: any) { alert(err.message); }
-    finally { setLoading(false); }
+    } catch (err: any) { 
+        alert(err.message); 
+    } finally { 
+        setLoading(false); 
+    }
   };
 
   return (
@@ -180,6 +198,7 @@ export default function RegisterPage() {
                     <input type="file" onChange={(e) => uploadAvatar(e, false)} className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*" />
                   </div>
                 </div>
+                
                 <input type="text" placeholder="NAMA LENGKAP" value={nama} onChange={(e)=>setNama(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold outline-none" required />
                 <input type="email" placeholder="EMAIL" value={email} onChange={(e)=>setEmail(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold outline-none" required />
                 
@@ -192,13 +211,38 @@ export default function RegisterPage() {
                     className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold outline-none pr-8" 
                     required 
                   />
-                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-2 text-slate-400 hover:text-blue-500">
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2 top-2 text-slate-400">
                     {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
                 </div>
 
+                <select 
+                  value={role} 
+                  onChange={(e) => setRole(e.target.value)}
+                  className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold outline-none"
+                >
+                  <option value="SKPD (OPD)">SKPD (OPD)</option>
+                  <option value="TAPD">TAPD</option>
+                  <option value="ADMIN">ADMIN</option>
+                  <option value="superadmin">SUPERADMIN</option>
+                </select>
+
+                {role === "SKPD (OPD)" && (
+                  <select 
+                    value={kdSkpd} 
+                    onChange={(e) => setKdSkpd(e.target.value)}
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold outline-none"
+                    required
+                  >
+                    <option value="">-- PILIH SKPD --</option>
+                    {listSkpd.map((s) => (
+                      <option key={s.kode} value={s.kode}>{s.nama}</option>
+                    ))}
+                  </select>
+                )}
+
                 <button disabled={loading || uploading} className="w-full bg-[#002855] text-white p-2 rounded font-black text-[9px] uppercase hover:bg-blue-600 transition-all">
-                  {loading ? "MENYIMPAN..." : "DAFTARKAN"}
+                  {loading ? "MENYIMPAN..." : "DAFTARKAN PETUGAS"}
                 </button>
               </form>
             </div>
@@ -216,7 +260,7 @@ export default function RegisterPage() {
             <thead>
               <tr className="text-[9px] font-black text-slate-400 uppercase border-b border-slate-100">
                 <th className="pb-3 px-2">Identitas Petugas</th>
-                <th className="pb-3 px-2 text-center">Otoritas</th>
+                <th className="pb-3 px-2 text-center">Otoritas / SKPD</th>
                 <th className="pb-3 px-2 text-center">Aksi</th>
               </tr>
             </thead>
@@ -240,26 +284,24 @@ export default function RegisterPage() {
                             <input value={editNama} onChange={(e)=>setEditNama(e.target.value)} className="w-full p-1.5 border border-blue-400 rounded text-[10px] font-bold outline-none" placeholder="Nama Lengkap" />
                             <input value={editEmail} onChange={(e)=>setEditEmail(e.target.value)} className="w-full p-1.5 border border-blue-400 rounded text-[10px] font-bold outline-none" placeholder="Email" />
                             
-                            {/* INPUT PASSWORD SAAT EDIT DENGAN SHOW/HIDE */}
                             <div className="relative">
                               <input 
                                 type={showEditPassword ? "text" : "password"} 
                                 value={editPassword} 
                                 onChange={(e)=>setEditPassword(e.target.value)} 
                                 className="w-full p-1.5 border border-orange-400 rounded text-[10px] font-bold outline-none pr-8 bg-orange-50/20" 
-                                placeholder="Ketik Password Baru jika ingin ganti" 
+                                placeholder="Password Baru (Opsional)" 
                               />
-                              <button type="button" onClick={() => setShowEditPassword(!showEditPassword)} className="absolute right-2 top-2 text-slate-400 hover:text-orange-600">
+                              <button type="button" onClick={() => setShowEditPassword(!showEditPassword)} className="absolute right-2 top-2 text-slate-400">
                                 {showEditPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                               </button>
                             </div>
-                            <p className="text-[7px] text-orange-500 font-bold italic italic uppercase leading-none">* Kosongkan password jika tidak ingin diubah</p>
                           </div>
                         </div>
                       ) : (
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-[#002855] rounded-lg flex items-center justify-center overflow-hidden shrink-0 border border-slate-200">
-                            {p.avatars ? <img src={p.avatars} className="w-full h-full object-cover" alt="avatar" /> : <span className="text-white text-xs font-black">{p.nama_lengkap?.substring(0, 1)}</span>}
+                            {p.avatar_url ? <img src={p.avatar_url} className="w-full h-full object-cover" alt="avatar" /> : <span className="text-white text-xs font-black">{p.nama_lengkap?.substring(0, 1)}</span>}
                           </div>
                           <div>
                             <p className="text-[11px] font-black uppercase text-slate-800 leading-tight">{p.nama_lengkap}</p>
@@ -269,7 +311,10 @@ export default function RegisterPage() {
                       )}
                     </td>
                     <td className="py-3 px-2 text-center text-[8px] font-black">
-                      <span className="px-2 py-0.5 rounded border border-blue-100 bg-blue-50 text-blue-600 uppercase">{p.role}</span>
+                      <div className="flex flex-col gap-1 items-center">
+                        <span className="px-2 py-0.5 rounded border border-blue-100 bg-blue-50 text-blue-600 uppercase">{p.role}</span>
+                        <span className="text-slate-400 uppercase">{p.kd_skpd}</span>
+                      </div>
                     </td>
                     <td className="py-3 px-2 text-center">
                       <div className="flex justify-center gap-2">
@@ -282,14 +327,14 @@ export default function RegisterPage() {
                           <>
                             <button 
                               onClick={()=>{
-                                setEditId(p.id); setEditNama(p.nama_lengkap); setEditEmail(p.email || ""); setEditRole(p.role); setEditAvatar(p.avatars || ""); setEditKdSkpd(p.kd_skpd || "");
+                                setEditId(p.id); setEditNama(p.nama_lengkap); setEditEmail(p.email || ""); setEditRole(p.role); setEditAvatar(p.avatar_url || ""); setEditKdSkpd(p.kd_skpd || "");
                               }} 
                               className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
                             >
                                 <Edit3 size={14}/>
                             </button>
                             {isSuperAdmin && p.id !== currentUser?.id && (
-                              <button onClick={async () => { if(confirm('Hapus user?')) { await supabase.from('profiles').delete().eq('id', p.id); fetchData(); } }} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded"><Trash2 size={14}/></button>
+                              <button onClick={async () => { if(confirm('Hapus user ini selamanya?')) { await supabase.from('profiles').delete().eq('id', p.id); fetchData(); } }} className="p-1.5 text-rose-500 hover:bg-rose-50 rounded"><Trash2 size={14}/></button>
                             )}
                           </>
                         )}
