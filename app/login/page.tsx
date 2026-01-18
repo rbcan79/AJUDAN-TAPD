@@ -138,9 +138,10 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-8 text-center text-[9px] font-bold text-slate-600 uppercase tracking-widest">
-          Sistem Informasi Perencanaan Daerah v1.0
+          Sistem Informasi Asistensi Usulan Kegiatan
         </p>
       </div>
     </div>
   );
 }
+
