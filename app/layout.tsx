@@ -1,17 +1,22 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 // Menggunakan font Inter untuk tampilan profesional
 const inter = Inter({ subsets: ["latin"] });
 
+// Solusi untuk menghilangkan peringatan "Unsupported metadata themeColor"
+export const viewport: Viewport = {
+  themeColor: "#1e3a8a",
+};
+
 export const metadata: Metadata = {
   title: "AJUDAN TAPD",
   description: "Sistem Asistensi Usulan Perencanaan Terintegrasi",
-  // Tambahan untuk identitas aplikasi di HP
+  // Konfigurasi PWA agar logo dan nama muncul di menu HP
   manifest: "/manifest.json", 
-  themeColor: "#1e3a8a",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -27,11 +32,10 @@ export default function RootLayout({
   return (
     <html lang="id">
       <body className={`${inter.className} bg-[#f4f7fe] text-slate-900 overflow-hidden`}>
-        {/* STRUKTUR TERPADU:
-            Kita membungkus 'children' langsung ke dalam komponen Sidebar.
-            Ini akan menghilangkan logo AD di pojok kanan dan memastikan 
-            Tahun Anggaran 2026 hanya muncul satu kali dengan format yang tegas.
-        */}
+        {/* Pemicu otomatis agar tombol "Instal Aplikasi" muncul di HP */}
+        <ServiceWorkerRegister />
+
+        {/* Fasilitas Sidebar dan struktur layout tetap dipertahankan */}
         <Sidebar>
           {children}
         </Sidebar>
