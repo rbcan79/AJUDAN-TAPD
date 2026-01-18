@@ -7,8 +7,16 @@ import Sidebar from "@/components/Sidebar";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "E-PLANNING | Enterprise System",
-  description: "Sistem Manajemen Perencanaan Terintegrasi",
+  title: "AJUDAN TAPD",
+  description: "Sistem Asistensi Usulan Perencanaan Terintegrasi",
+  // Tambahan untuk identitas aplikasi di HP
+  manifest: "/manifest.json", 
+  themeColor: "#1e3a8a",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "AJUDAN TAPD",
+  },
 };
 
 export default function RootLayout({
@@ -20,9 +28,9 @@ export default function RootLayout({
     <html lang="id">
       <body className={`${inter.className} bg-[#f4f7fe] text-slate-900 overflow-hidden`}>
         {/* STRUKTUR TERPADU:
-          Kita membungkus 'children' langsung ke dalam komponen Sidebar.
-          Ini akan menghilangkan logo AD di pojok kanan dan memastikan 
-          Tahun Anggaran 2026 hanya muncul satu kali dengan format yang tegas.
+            Kita membungkus 'children' langsung ke dalam komponen Sidebar.
+            Ini akan menghilangkan logo AD di pojok kanan dan memastikan 
+            Tahun Anggaran 2026 hanya muncul satu kali dengan format yang tegas.
         */}
         <Sidebar>
           {children}
