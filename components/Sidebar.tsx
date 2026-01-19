@@ -1,176 +1,258 @@
 "use client";
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
-  LayoutDashboard, Users, Database, LogOut, 
-  Menu, ChevronLeft, Search, ClipboardCheck, Settings, BookOpen
+  Video, Calendar, Clock, ArrowLeft, 
+  Users, PlayCircle, Loader2, Save, StickyNote, CheckCircle,
+  Plus, X
 } from "lucide-react";
 
-export default function Sidebar({ children }: { children: React.ReactNode }) {
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [userData, setUserData] = useState<{ name: string; role: string; avatar?: string } | null>(null);
-  const [statusAnggaran, setStatusAnggaran] = useState<string>(""); 
-  const [isReady, setIsReady] = useState(false);
-  const pathname = usePathname();
-  const router = useRouter();
+export default function RapatTAPDPage() {
+  const [loading, setLoading] = useState(true);
+  const [listRapat, setListRapat] = useState<any[]>([]);
+  const [activeRoom, setActiveRoom] = useState<any | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  
+  // States untuk Catatan
+  const [catatan, setCatatan] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<string | null>(null);
 
-  const isAuthPage = pathname === "/login";
+  // States untuk Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    judul_rapat: "",
+    keterangan: "",
+    tanggal: "",
+    jam: ""
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        if (!isAuthPage) router.push("/login");
-        setIsReady(true);
-        return;
-      }
+    fetchInitialData();
+  }, []);
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("nama_lengkap, role, avatars")
+  const fetchInitialData = async () => {
+    setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      const { data: prof } = await supabase.from("profiles")
+        .select("id, nama_lengkap, role")
         .eq("id", session.user.id)
         .single();
+      setUserProfile(prof);
+    }
 
-      if (profile) {
-        setUserData({
-          name: profile.nama_lengkap,
-          role: profile.role ? profile.role.trim() : "GUEST",
-          avatar: profile.avatars 
-        });
+    const { data: rapat } = await supabase.from("rapat")
+      .select("*")
+      .order("tanggal_rapat", { ascending: false });
+    
+    setListRapat(rapat || []);
+    setLoading(false);
+  };
+
+  const handleAddRapat = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    const roomId = `tapd-room-${Math.random().toString(36).substring(2, 9)}`;
+    const fullDate = `${formData.tanggal}T${formData.jam}:00`;
+
+    const { error } = await supabase.from("rapat").insert([
+      {
+        judul_rapat: formData.judul_rapat,
+        keterangan: formData.keterangan,
+        tanggal_rapat: fullDate,
+        room_id: roomId,
+        status: 'scheduled'
       }
+    ]);
 
-      const { data: settings } = await supabase
-        .from("settings")
-        .select("current_status_anggaran")
-        .eq("is_locked", true) 
-        .maybeSingle();
-      
-      if (settings) setStatusAnggaran(settings.current_status_anggaran);
-      
-      setIsReady(true);
-    };
+    if (!error) {
+      setIsModalOpen(false);
+      setFormData({ judul_rapat: "", keterangan: "", tanggal: "", jam: "" });
+      fetchInitialData();
+    }
+    setIsSubmitting(false);
+  };
 
-    checkSession();
-  }, [pathname, router, isAuthPage]);
+  const fetchUserNote = async (rapatId: string, userId: string) => {
+    const { data } = await supabase.from("catatan_rapat")
+      .select("isi_catatan").eq("rapat_id", rapatId).eq("user_id", userId).single();
+    if (data) setCatatan(data.isi_catatan);
+    else setCatatan("");
+  };
 
-  if (isAuthPage) return <>{children}</>;
-  if (!isReady) return <div className="h-screen w-full bg-[#002855]" />;
+  const saveNote = async () => {
+    if (!activeRoom || !userProfile) return;
+    setIsSaving(true);
+    await supabase.from("catatan_rapat").upsert({
+      rapat_id: activeRoom.id,
+      user_id: userProfile.id,
+      isi_catatan: catatan,
+      updated_at: new Date()
+    }, { onConflict: 'rapat_id,user_id' });
+    setLastSaved(new Date().toLocaleTimeString());
+    setIsSaving(false);
+  };
 
-  const allMenuItems = [
-    { name: "DASHBOARD", path: "/", icon: <LayoutDashboard size={18} />, roles: ["superadmin", "ADMIN", "TAPD", "SKPD (OPD)"] },
-    { name: "USER MANAGEMENT", path: "/register", icon: <Users size={18} />, roles: ["superadmin", "ADMIN", "TAPD", "SKPD (OPD)"] },
-    { name: "CEK DATA", path: "/cek-data", icon: <Search size={18} />, roles: ["superadmin", "ADMIN"] }, 
-    { name: "USULAN KEGIATAN", path: "/usulan", icon: <Database size={18} />, roles: ["superadmin", "SKPD (OPD)"] },
-    { name: "ASISTENSI TAPD", path: "/asistensi", icon: <ClipboardCheck size={18} />, roles: ["superadmin", "TAPD"] },
-    { name: "PENGESAHAN USULAN", path: "/pengesahan", icon: <BookOpen size={18} />, roles: ["superadmin", "ADMIN"] },
-    { name: "KONFIGURASI ADMIN", path: "/admin", icon: <Settings size={18} />, roles: ["superadmin"] },
-  ];
+  const joinRapat = (rapat: any) => {
+    setActiveRoom(rapat);
+    if (userProfile) fetchUserNote(rapat.id, userProfile.id);
+    setTimeout(() => {
+      // @ts-ignore
+      new window.JitsiMeetExternalAPI("meet.jit.si", {
+        roomName: rapat.room_id,
+        width: "100%", height: "100%",
+        parentNode: document.querySelector("#jitsi-container"),
+        userInfo: { displayName: userProfile?.nama_lengkap || "User TAPD" },
+      });
+    }, 500);
+  };
 
-  const filteredMenus = allMenuItems.filter((item) => {
-    if (!userData) return item.name === "DASHBOARD";
-    return item.roles.includes(userData.role);
-  });
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center min-h-screen">
+      <Loader2 className="animate-spin text-indigo-600 mb-2" />
+      <p className="text-[10px] font-black text-slate-400 uppercase italic">Memuat Data...</p>
+    </div>
+  );
+
+  // --- VIEW: VIDEO CONFERENCE ---
+  if (activeRoom) {
+    return (
+      <div className="h-screen bg-slate-900 flex flex-col overflow-hidden">
+        <div className="p-3 bg-slate-800 flex items-center justify-between border-b border-slate-700">
+          <div className="flex items-center gap-3">
+            <button onClick={() => window.location.reload()} className="p-2 bg-slate-700 hover:bg-rose-600 text-white rounded-lg transition-all">
+              <ArrowLeft size={18} />
+            </button>
+            <h1 className="text-white text-[11px] font-black uppercase italic">{activeRoom.judul_rapat}</h1>
+          </div>
+          <span className="text-indigo-400 text-[10px] font-black uppercase tracking-widest">{userProfile?.nama_lengkap}</span>
+        </div>
+        <div className="flex flex-1 overflow-hidden">
+          <div id="jitsi-container" className="flex-1 bg-black"></div>
+          
+          {/* KOLOM CATATAN (DIPERBAIKI WARNA TEKSNYA) */}
+          <div className="w-80 md:w-96 bg-white flex flex-col border-l border-slate-200">
+            <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
+              <span className="text-[10px] font-black text-slate-700 uppercase">Notulensi Pribadi</span>
+              {lastSaved && <span className="text-[8px] font-bold text-emerald-500 italic">Saved: {lastSaved}</span>}
+            </div>
+            {/* Teks di sini dipastikan Slate-900 (Hitam) */}
+            <textarea 
+              className="flex-1 p-5 text-[13px] font-semibold text-slate-900 leading-relaxed outline-none resize-none bg-white placeholder:text-slate-300" 
+              placeholder="Tulis hasil rapat di sini..." 
+              value={catatan} 
+              onChange={(e) => setCatatan(e.target.value)} 
+            />
+            <div className="p-4 bg-slate-50 border-t">
+              <button onClick={saveNote} disabled={isSaving} className="w-full py-3 bg-[#002855] text-white rounded-xl text-[10px] font-black uppercase italic flex items-center justify-center gap-2">
+                {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Simpan Catatan
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-screen w-full bg-[#f8fafc] overflow-hidden font-sans">
-      {/* SIDEBAR LEFT (NAVY) */}
-      <aside className={`bg-[#002855] text-white transition-all duration-300 flex flex-col h-full shrink-0 shadow-2xl z-20 ${isCollapsed ? "w-20" : "w-64"}`}>
-        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-[#001e40] min-h-[73px]">
-          {!isCollapsed && (
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full border-2 border-blue-400 overflow-hidden shrink-0 bg-white">
-                <img src="/ajudan-wanita.png" alt="Logo" className="w-full h-full object-cover" />
-              </div>
-              <div className="flex flex-col text-left">
-                <span className="text-sm font-black italic leading-none uppercase">AJUDAN</span>
-                <span className="text-sm font-black italic leading-none text-blue-400 uppercase">TAPD</span>
-              </div>
-            </div>
-          )}
-          <button onClick={() => setIsCollapsed(!isCollapsed)} className="p-2 hover:bg-blue-800 rounded-lg mx-auto">
-            {isCollapsed ? <Menu size={20} /> : <ChevronLeft size={20} />}
-          </button>
-        </div>
-
-        <div className={`p-4 border-b border-white/10 flex items-center gap-3 bg-[#002855]/50 ${isCollapsed ? "justify-center" : ""}`}>
-          <div className="w-10 h-10 rounded-full border-2 border-blue-400 overflow-hidden bg-white shrink-0 shadow-md">
-            {userData?.avatar ? <img src={userData.avatar} className="w-full h-full object-cover" /> : <div className="text-blue-600 font-bold flex items-center justify-center h-full text-xs">U</div>}
-          </div>
-          {!isCollapsed && (
-            <div className="overflow-hidden text-left">
-              <p className="text-[10px] font-black uppercase italic text-white truncate mb-1">{userData?.name || "MEMUAT..."}</p>
-              <p className="text-[8px] font-bold text-orange-400 uppercase tracking-widest">{userData?.role || "GUEST"}</p>
-            </div>
-          )}
-        </div>
-        
-        <nav className="flex-1 p-3 space-y-1.5 mt-2 overflow-y-auto">
-          {filteredMenus.map((item) => (
-            <Link key={item.path} href={item.path} className={`flex items-center gap-4 px-3 py-2.5 rounded-xl text-[9px] font-bold transition-all uppercase italic tracking-widest group ${pathname === item.path ? "bg-blue-600 text-white shadow-lg" : "text-blue-200 hover:bg-blue-800/60 hover:text-white"}`}>
-              {item.icon}
-              {!isCollapsed && <span className="truncate">{item.name}</span>}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="p-3 border-t border-white/10 bg-[#001e40]">
-          <button onClick={async () => { if(confirm("Yakin ingin keluar?")) { await supabase.auth.signOut(); router.push("/login"); } }} className="flex items-center gap-4 px-4 py-3 w-full text-[9px] font-bold text-red-400 hover:bg-red-500 hover:text-white rounded-xl transition-all uppercase italic group">
-            <LogOut size={20} />
-            {!isCollapsed && <span>KELUAR SISTEM</span>}
-          </button>
-        </div>
-      </aside>
-
-      {/* RIGHT CONTENT AREA */}
-      <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        {/* HEADER - DISAMAKAN DENGAN WARNA SIDEBAR (NAVY) */}
-        <header className="h-[105px] bg-[#002855] border-b border-white/10 flex items-center justify-between px-8 shrink-0 shadow-xl z-10">
-          <div className="flex items-center gap-6">
-            
-            {/* LOGO SJJGP DENGAN CONTAINER PUTIH (Tetap Putih agar Logo Jelas) */}
-            <div className="h-20 w-auto bg-white p-1.5 rounded-xl shadow-lg shrink-0 flex items-center justify-center border border-white/20">
-              <img 
-                src="/sjjgp.png" 
-                alt="Logo Sijunjung Geopark" 
-                className="h-full w-auto object-contain"
-              />
-            </div>
-            
-            <div className="flex flex-col text-left">
-              {/* TEKS TAHUN ANGGARAN - SEKARANG WARNA PUTIH/CYAN AGAR KONTRAS */}
-              <h2 className="text-[20px] font-[1000] text-white tracking-tighter leading-none uppercase">
-                TAHUN ANGGARAN 2026
-              </h2>
-              {/* TEKS STATUS - WARNA BIRU MUDA/CYAN AGAR MENYALA */}
-              <p className="text-[12px] font-extrabold text-blue-400 uppercase mt-2 tracking-wider italic">
-                {statusAnggaran ? `● ${statusAnggaran}` : "● MEMUAT STATUS..."}
-              </p>
+    <div className="p-6 bg-slate-50 min-h-screen">
+      <div className="max-w-6xl mx-auto">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-8 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <div className="p-4 bg-[#002855] text-white rounded-2xl shadow-xl"><Video size={28} /></div>
+            <div>
+              <h1 className="text-lg font-black uppercase italic leading-none text-slate-800">Ruang Rapat Virtual</h1>
+              <p className="text-[10px] font-bold text-slate-400 mt-1 uppercase italic tracking-widest">Digital Conference System</p>
             </div>
           </div>
+          {(userProfile?.role === "superadmin" || userProfile?.role === "ADMIN") && (
+            <button onClick={() => setIsModalOpen(true)} className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-[10px] font-black uppercase italic flex items-center gap-2 shadow-lg transition-all active:scale-95">
+              <Plus size={18} /> Buat Jadwal Rapat
+            </button>
+          )}
+        </div>
 
-          {/* FASILITAS LOGO WANITA DI KANAN (TETAP ADA) */}
-          <div className="flex flex-col items-center">
-             <div className="w-14 h-14 rounded-full border-2 border-blue-400 overflow-hidden bg-white shadow-lg flex items-center justify-center">
-                <img 
-                  src="/ajudan-wanita1.png" 
-                  alt="Ajudan Wanita" 
-                  className="w-full h-full object-cover object-top"
+        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
+          <table className="w-full text-left">
+            <thead className="bg-slate-50 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
+              <tr>
+                <th className="px-6 py-4">Agenda Rapat</th>
+                <th className="px-6 py-4">Waktu</th>
+                <th className="px-6 py-4 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {listRapat.map((r) => (
+                <tr key={r.id} className="hover:bg-slate-50 transition-all">
+                  <td className="px-6 py-5">
+                    <span className="text-[12px] font-black text-slate-800 uppercase italic leading-none">{r.judul_rapat}</span>
+                    <p className="text-[9px] font-medium text-slate-400 mt-1 uppercase">{r.keterangan || "-"}</p>
+                  </td>
+                  <td className="px-6 py-5 text-[10px] font-bold text-slate-600">
+                    {new Date(r.tanggal_rapat).toLocaleString('id-ID')} WIB
+                  </td>
+                  <td className="px-6 py-5 text-center">
+                    <button onClick={() => joinRapat(r)} className="px-5 py-2.5 bg-[#002855] hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase italic flex items-center gap-2 mx-auto transition-all shadow-md">
+                      <PlayCircle size={14} /> Gabung
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* MODAL (DIPERBAIKI WARNA TEKS INPUT) */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#002855]/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in duration-200">
+            <div className="p-6 bg-[#002855] text-white flex justify-between items-center">
+              <h3 className="text-sm font-black uppercase italic">Jadwal Rapat Baru</h3>
+              <button onClick={() => setIsModalOpen(false)}><X size={20} /></button>
+            </div>
+
+            <form onSubmit={handleAddRapat} className="p-8 space-y-5">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Judul Rapat</label>
+                <input 
+                  required type="text" 
+                  className="w-full px-4 py-3 bg-slate-100 border-2 border-slate-200 rounded-2xl text-[12px] font-bold text-slate-900 focus:border-indigo-500 outline-none" 
+                  value={formData.judul_rapat} 
+                  onChange={(e) => setFormData({...formData, judul_rapat: e.target.value})} 
                 />
-             </div>
-             <span className="text-[11px] font-serif font-black italic tracking-tighter mt-1 leading-none text-blue-400 uppercase">
-                AJUDAN TAPD
-             </span>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Keterangan</label>
+                <textarea 
+                  className="w-full px-4 py-3 bg-slate-100 border-2 border-slate-200 rounded-2xl text-[12px] font-bold text-slate-900 focus:border-indigo-500 outline-none h-24 resize-none" 
+                  value={formData.keterangan} 
+                  onChange={(e) => setFormData({...formData, keterangan: e.target.value})} 
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <input 
+                  required type="date" 
+                  className="px-4 py-3 bg-slate-100 border-2 border-slate-200 rounded-2xl text-[12px] font-bold text-slate-900 outline-none" 
+                  value={formData.tanggal} 
+                  onChange={(e) => setFormData({...formData, tanggal: e.target.value})} 
+                />
+                <input 
+                  required type="time" 
+                  className="px-4 py-3 bg-slate-100 border-2 border-slate-200 rounded-2xl text-[12px] font-bold text-slate-900 outline-none" 
+                  value={formData.jam} 
+                  onChange={(e) => setFormData({...formData, jam: e.target.value})} 
+                />
+              </div>
+              <button type="submit" disabled={isSubmitting} className="w-full py-4 bg-[#002855] text-white rounded-2xl text-[11px] font-black uppercase italic shadow-xl flex items-center justify-center gap-2">
+                {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} Simpan Jadwal
+              </button>
+            </form>
           </div>
-        </header>
-
-        {/* CONTENT AREA */}
-        <div className="flex-1 overflow-y-auto bg-[#f8fafc] p-8 scroll-smooth">
-           {children}
         </div>
-      </main>
+      )}
     </div>
   );
 }
