@@ -5,11 +5,24 @@ import { useRouter } from "next/navigation";
 import { 
   FileCheck, Search, Printer, Eye, LayoutList, 
   Building2, CheckSquare, Square, ShieldCheck, RotateCcw,
-  CheckCircle2, clock, AlertCircle
+  CheckCircle2, Clock, AlertCircle // PERBAIKAN: Clock (Huruf Besar)
 } from "lucide-react";
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+
+// Interface untuk menghindari error TypeScript 'any'
+interface Usulan {
+  id: number;
+  kd_skpd: string;
+  nama_unit: string;
+  nama_kegiatan: string;
+  anggaran: number;
+  status: string;
+  status_pembahasan: string;
+  tanggal_pengesahan: string | null;
+  isApprovedByTapd: boolean;
+}
 
 export default function FinalPengesahanPage() {
   const router = useRouter();
@@ -18,7 +31,7 @@ export default function FinalPengesahanPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [skpdList, setSkpdList] = useState<any[]>([]);
   
-  const [laporanFullData, setLaporanFullData] = useState<any[]>([]); 
+  const [laporanFullData, setLaporanFullData] = useState<Usulan[]>([]); 
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSkpd, setSelectedSkpd] = useState("all");
@@ -61,14 +74,16 @@ export default function FinalPengesahanPage() {
       const { data: allUsulans } = await query.order("kd_skpd", { ascending: true });
       if (!allUsulans) return;
 
-      const mappedData = allUsulans.map(u => ({
+      const mappedData: Usulan[] = allUsulans.map(u => ({
         ...u,
         nama_unit: skpdList.find(s => s.kode === u.kd_skpd)?.nama || u.nama_skpd,
-        isApprovedByTapd: asistensiRaw?.some(a => a.usulan_id === u.id && a.rekomendasi === "SETUJU")
+        isApprovedByTapd: asistensiRaw?.some(a => a.usulan_id === u.id && a.rekomendasi === "SETUJU") || false
       }));
 
       setLaporanFullData(mappedData);
       setSelectedIds([]);
+    } catch (e) {
+      console.error(e);
     } finally {
       setFetching(false);
     }
@@ -91,19 +106,21 @@ export default function FinalPengesahanPage() {
     setFetching(false);
   };
 
-  // PEMBAGIAN DATA
   const dataSah = laporanFullData.filter(u => u.status === 'DISETUJUI' && u.nama_kegiatan?.toLowerCase().includes(searchTerm.toLowerCase()));
   const dataBelumSah = laporanFullData.filter(u => u.status !== 'DISETUJUI' && u.isApprovedByTapd && u.nama_kegiatan?.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const generatePDF = () => {
     const doc = new jsPDF("l", "mm", "a4");
-    const dateNow = new Intl.DateTimeFormat('id-ID', { dateStyle: 'long' }).format(new Date());
-    doc.setFontSize(16).setFont("helvetica", "bold").text("LAPORAN PENGESAHAN DOKUMEN ANGGARAN", 14, 15);
-    // ... (Logika PDF tetap sama seperti sebelumnya)
+    autoTable(doc, { 
+        startY: 20,
+        head: [['NO', 'KEGIATAN', 'ANGGARAN', 'STATUS']],
+        body: laporanFullData.map((u, i) => [i+1, u.nama_kegiatan, u.anggaran, u.status])
+    });
     doc.save(`Laporan_Pengesahan.pdf`);
   };
 
-  const TableComponent = ({ title, data, type }: { title: string, data: any[], type: 'SAH' | 'BELUM' }) => (
+  // Komponen Tabel
+  const TableComponent = ({ title, data, type }: { title: string, data: Usulan[], type: 'SAH' | 'BELUM' }) => (
     <div className="mb-10">
       <div className="flex items-center gap-2 mb-4">
         <div className={`w-2 h-6 rounded-full ${type === 'SAH' ? 'bg-emerald-500' : 'bg-orange-500'}`}></div>
@@ -114,14 +131,17 @@ export default function FinalPengesahanPage() {
           <thead>
             <tr className="bg-slate-50/50 text-[9px] font-black text-slate-400 uppercase tracking-wider border-b border-slate-100">
               <th className="px-6 py-4 w-12 text-center">
-                <button onClick={() => {
-                  const allIds = data.map(u => u.id);
-                  const isAllSelected = allIds.every(id => selectedIds.includes(id));
-                  if (isAllSelected) setSelectedIds(selectedIds.filter(id => !allIds.includes(id)));
-                  else setSelectedIds([...new Set([...selectedIds, ...allIds])]);
-                }}>
-                  {data.length > 0 && data.every(u => selectedIds.includes(u.id)) ? <CheckSquare size={18} className="text-indigo-600" /> : <Square size={18} className="text-slate-200" />}
-                </button>
+                <input 
+                  type="checkbox"
+                  className="w-4 h-4 cursor-pointer"
+                  checked={data.length > 0 && data.every(u => selectedIds.includes(u.id))}
+                  onChange={() => {
+                    const allIds = data.map(u => u.id);
+                    const isAllSelected = allIds.every(id => selectedIds.includes(id));
+                    if (isAllSelected) setSelectedIds(selectedIds.filter(id => !allIds.includes(id)));
+                    else setSelectedIds([...new Set([...selectedIds, ...allIds])]);
+                  }}
+                />
               </th>
               <th className="px-6 py-4 italic">Detail Usulan</th>
               <th className="px-6 py-4 text-right italic">Anggaran</th>
@@ -130,27 +150,32 @@ export default function FinalPengesahanPage() {
           </thead>
           <tbody className="divide-y divide-slate-50">
             {data.length === 0 ? (
-              <tr><td colSpan={4} className="py-10 text-center text-[10px] font-bold text-slate-300 uppercase italic">Tidak ada data di kategori ini</td></tr>
+              <tr><td colSpan={4} className="py-10 text-center text-[10px] font-bold text-slate-300 uppercase italic">Tidak ada data</td></tr>
             ) : data.map((u) => (
               <tr key={u.id} className={`group hover:bg-slate-50/50 transition-all ${selectedIds.includes(u.id) ? 'bg-indigo-50/30' : ''}`}>
                 <td className="px-6 py-5 text-center">
-                  <button onClick={() => setSelectedIds(prev => prev.includes(u.id) ? prev.filter(i => i !== u.id) : [...prev, u.id])}>
-                    {selectedIds.includes(u.id) ? <CheckSquare size={18} className="text-indigo-600" /> : <Square size={18} className="text-slate-200" />}
-                  </button>
+                  <input 
+                    type="checkbox"
+                    className="w-4 h-4 cursor-pointer"
+                    checked={selectedIds.includes(u.id)}
+                    onChange={() => setSelectedIds(prev => prev.includes(u.id) ? prev.filter(i => i !== u.id) : [...prev, u.id])}
+                  />
                 </td>
                 <td className="px-6 py-5">
                   <div className="flex flex-col">
                     <span className="text-[9px] font-black text-indigo-500 uppercase mb-1">{u.nama_unit}</span>
                     <span className="text-[11px] font-bold text-slate-700 uppercase leading-tight">{u.nama_kegiatan}</span>
                     {u.tanggal_pengesahan && (
-                      <span className="text-[8px] font-black text-emerald-600 mt-2 uppercase italic">✓ Sah: {new Date(u.tanggal_pengesahan).toLocaleDateString('id-ID')}</span>
+                      <span className="text-[8px] font-black text-emerald-600 mt-2 uppercase italic flex items-center gap-1">
+                        <CheckCircle2 size={10} /> Sah: {new Date(u.tanggal_pengesahan).toLocaleDateString('id-ID')}
+                      </span>
                     )}
                   </div>
                 </td>
                 <td className="px-6 py-5 text-right font-black text-slate-900 text-[11px]">Rp {Number(u.anggaran).toLocaleString('id-ID')}</td>
                 <td className="px-6 py-5 text-center">
                   <button onClick={() => handleAction([u.id], type === 'SAH' ? 'BATAL' : 'SAH')} className={`text-[9px] font-black px-4 py-2 rounded-xl uppercase transition-all ${type === 'SAH' ? 'text-rose-600 border border-rose-100 hover:bg-rose-50' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}>
-                    {type === 'SAH' ? 'Batal Sah' : 'Sahkan'}
+                    {type === 'SAH' ? 'Batal' : 'Sahkan'}
                   </button>
                 </td>
               </tr>
@@ -161,28 +186,24 @@ export default function FinalPengesahanPage() {
     </div>
   );
 
-  if (loading) return <div className="p-20 text-center font-black animate-pulse text-slate-400 uppercase italic">Memuat Data...</div>;
-
   return (
     <div className="p-4 bg-slate-50 min-h-screen font-sans text-slate-900">
-      {/* HEADER CONTROLS (Fasilitas Tetap Ada) */}
       <div className="flex flex-col xl:flex-row justify-between items-center mb-6 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm gap-4">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg"><FileCheck size={24} /></div>
           <div>
             <h1 className="text-sm font-black uppercase italic leading-none text-slate-800">Manajemen Pengesahan</h1>
-            <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase italic">Total Data: {laporanFullData.length} | User: {currentUser?.nama_lengkap}</p>
+            <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase italic">User: {currentUser?.nama_lengkap || 'Admin'}</p>
           </div>
         </div>
 
         <div className="flex flex-wrap gap-2 justify-end w-full xl:w-auto">
-          <button onClick={() => setShowPreview(!showPreview)} className={`flex items-center gap-2 text-[10px] font-black px-4 py-2 rounded-lg transition-all ${showPreview ? 'bg-orange-500 text-white' : 'bg-slate-800 text-white'}`}>
+          <button onClick={() => setShowPreview(!showPreview)} className="flex items-center gap-2 text-[10px] font-black px-4 py-2 rounded-lg bg-slate-800 text-white">
             {showPreview ? <LayoutList size={14} /> : <Eye size={14} />} {showPreview ? "TUTUP REKAP" : "LIHAT REKAP"}
           </button>
-          <button onClick={generatePDF} className="flex items-center gap-2 bg-emerald-600 text-white text-[10px] font-black px-4 py-2 rounded-lg hover:bg-emerald-700 shadow-md">
+          <button onClick={generatePDF} className="flex items-center gap-2 bg-emerald-600 text-white text-[10px] font-black px-4 py-2 rounded-lg shadow-md">
             <Printer size={14} /> CETAK PDF
           </button>
-          <div className="h-8 w-[1px] bg-slate-200 mx-1 hidden xl:block"></div>
           <select className="text-[10px] font-black px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg text-indigo-700 outline-none" value={selectedStatusAnggaran} onChange={(e) => setSelectedStatusAnggaran(e.target.value)}>
             <option value="all">SEMUA STATUS</option>
             {statusAnggaranList.map((s, idx) => <option key={idx} value={s.current_status_anggaran}>{s.current_status_anggaran}</option>)}
@@ -198,63 +219,44 @@ export default function FinalPengesahanPage() {
         <div className="space-y-2">
           <div className="relative w-full md:w-80 mb-6">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="text" placeholder="Cari Kegiatan..." className="w-full text-[11px] font-bold pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none" onChange={(e) => setSearchTerm(e.target.value)} />
+            <input type="text" placeholder="Cari Kegiatan..." className="w-full text-[11px] font-bold pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none shadow-sm" onChange={(e) => setSearchTerm(e.target.value)} />
           </div>
-
           <TableComponent title="Daftar Usulan Sudah Sah" data={dataSah} type="SAH" />
-          <TableComponent title="Daftar Usulan Belum Sah (Tunggu Pengesahan)" data={dataBelumSah} type="BELUM" />
+          <TableComponent title="Daftar Usulan Belum Sah" data={dataBelumSah} type="BELUM" />
         </div>
       ) : (
-        /* MONITORING PREVIEW (Fasilitas Tetap Ada) */
-        <div className="bg-white rounded-2xl border-2 border-orange-200 overflow-hidden shadow-xl">
-           <div className="bg-orange-500 p-4 text-white text-[11px] font-black uppercase flex justify-between">
-              <span>Preview Rekapitulasi Monitoring</span>
-              <span>{laporanFullData.length} Kegiatan</span>
-           </div>
-           <div className="p-6 overflow-x-auto">
-              <table className="w-full text-[10px] border-collapse">
-                <thead>
-                  <tr className="bg-slate-100 text-slate-600 text-left uppercase font-black">
-                    <th className="p-3 border">NO</th>
-                    <th className="p-3 border">KEGIATAN / SKPD</th>
-                    <th className="p-3 border text-right">ANGGARAN</th>
-                    <th className="p-3 border text-center">STATUS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {laporanFullData.map((u, i) => (
-                    <tr key={i} className="hover:bg-slate-50 transition-colors">
-                      <td className="p-2 border text-center font-bold text-slate-400">{i+1}</td>
-                      <td className="p-2 border">
-                         <p className="font-bold uppercase text-slate-700">{u.nama_kegiatan}</p>
-                         <p className="text-[8px] text-indigo-500 mt-1 font-bold">{u.nama_unit}</p>
-                      </td>
-                      <td className="p-2 border text-right font-black">Rp {Number(u.anggaran).toLocaleString('id-ID')}</td>
-                      <td className="p-2 border text-center font-black">
-                         {u.status === 'DISETUJUI' ? <span className="text-emerald-600">SUDAH SAH</span> : <span className="text-orange-500">BELUM SAH</span>}
-                      </td>
+        <div className="bg-white rounded-2xl border-2 border-orange-200 overflow-hidden shadow-xl p-6">
+           <h3 className="font-black text-orange-600 mb-4 uppercase italic">Rekapitulasi Monitoring</h3>
+           <table className="w-full text-[10px] border">
+              <thead className="bg-slate-100">
+                <tr>
+                    <th className="p-2 border">KEGIATAN</th>
+                    <th className="p-2 border">STATUS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {laporanFullData.map((u, i) => (
+                    <tr key={i}>
+                        <td className="p-2 border font-bold">{u.nama_kegiatan}</td>
+                        <td className="p-2 border text-center">{u.status}</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-           </div>
+                ))}
+              </tbody>
+           </table>
         </div>
       )}
 
-      {/* FLOATING ACTION BAR (Fasilitas Tetap Ada & Cerdas) */}
       {selectedIds.length > 0 && (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-8 py-4 rounded-3xl flex items-center gap-6 shadow-2xl z-50 animate-in slide-in-from-bottom-4">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest border-r border-slate-700 pr-6">
-            <span className="text-white text-lg font-black">{selectedIds.length}</span> Data Terpilih
-          </div>
-          <div className="flex gap-3">
-            <button onClick={() => handleAction(selectedIds, 'SAH')} className="bg-indigo-500 hover:bg-indigo-600 px-6 py-3 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 transition-all">
-              <ShieldCheck size={14} /> Sahkan Semua Terpilih
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-8 py-4 rounded-3xl flex items-center gap-6 shadow-2xl z-50">
+          <span className="text-[10px] font-black uppercase"><span className="text-emerald-400 text-lg">{selectedIds.length}</span> Data Terpilih</span>
+          <div className="flex gap-2">
+            <button onClick={() => handleAction(selectedIds, 'SAH')} className="bg-indigo-500 px-6 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2">
+              <ShieldCheck size={14} /> Sahkan
             </button>
-            <button onClick={() => handleAction(selectedIds, 'BATAL')} className="bg-rose-600 hover:bg-rose-700 px-6 py-3 rounded-2xl text-[10px] font-black uppercase flex items-center gap-2 transition-all">
-              <RotateCcw size={14} /> Batalkan Pengesahan Terpilih
+            <button onClick={() => handleAction(selectedIds, 'BATAL')} className="bg-rose-600 px-6 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2">
+              <RotateCcw size={14} /> Batalkan
             </button>
-            <button onClick={() => setSelectedIds([])} className="text-slate-400 hover:text-white text-[10px] font-black uppercase px-4">Batal</button>
+            <button onClick={() => setSelectedIds([])} className="text-slate-400 text-[10px] font-black uppercase px-4">Tutup</button>
           </div>
         </div>
       )}
