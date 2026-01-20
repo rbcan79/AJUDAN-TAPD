@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
   UserPlus, Trash2, Edit3, Check, X, 
-  RefreshCw, ShieldCheck, Lock, Camera, Eye, EyeOff, User
+  RefreshCw, ShieldCheck, Lock, Camera, Eye, EyeOff, User, Hash
 } from "lucide-react";
 
 export default function RegisterPage() {
@@ -21,6 +21,7 @@ export default function RegisterPage() {
 
   // State Form Register
   const [nama, setNama] = useState("");
+  const [nip, setNip] = useState(""); 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [role, setRole] = useState("SKPD (OPD)");
@@ -30,6 +31,7 @@ export default function RegisterPage() {
   // State Edit
   const [editId, setEditId] = useState<string | null>(null);
   const [editNama, setEditNama] = useState("");
+  const [editNip, setEditNip] = useState("");
   const [editRole, setEditRole] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState(""); 
@@ -97,29 +99,26 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     try {
-      // 1. Create User di Auth Supabase
       const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
       if (authError) throw authError;
 
       if (authData.user) {
-        // Tentukan KD SKPD (Jika admin/superadmin biasanya akses global/ALL)
         const finalKdSkpd = (role === 'superadmin' || role === 'TAPD' || role === 'ADMIN') ? 'ALL' : kdSkpd;
         
-        // 2. Insert ke tabel profiles (Menggunakan avatar_url sesuai gambar DB)
         const { error: profileError } = await supabase.from("profiles").upsert({ 
           id: authData.user.id, 
           nama_lengkap: nama, 
+          nip: nip,
           role, 
           email,
           kd_skpd: finalKdSkpd, 
-          avatar_url: avatarUrl // Disesuaikan dengan kolom DB Anda
+          avatar_url: avatarUrl 
         });
 
         if (profileError) throw profileError;
 
         alert("Petugas Berhasil Didaftarkan");
-        // Reset Form
-        setNama(""); setEmail(""); setPassword(""); setAvatarUrl(""); setKdSkpd("");
+        setNama(""); setNip(""); setEmail(""); setPassword(""); setAvatarUrl(""); setKdSkpd("");
         fetchData();
       }
     } catch (err: any) { 
@@ -135,8 +134,9 @@ export default function RegisterPage() {
       const finalKdSkpd = (editRole === 'superadmin' || editRole === 'TAPD' || editRole === 'ADMIN') ? 'ALL' : editKdSkpd;
       const updateData: any = { 
         nama_lengkap: editNama, 
+        nip: editNip,
         email: editEmail,
-        avatar_url: editAvatar, // Disesuaikan dengan kolom DB Anda
+        avatar_url: editAvatar,
         kd_skpd: finalKdSkpd 
       };
       
@@ -145,7 +145,6 @@ export default function RegisterPage() {
       const { error: profileError } = await supabase.from("profiles").update(updateData).eq("id", id);
       if (profileError) throw profileError;
 
-      // Update password jika diisi
       if (editPassword) {
         const { error: pwdError } = await supabase.auth.updateUser({ password: editPassword });
         if (pwdError) throw pwdError;
@@ -199,7 +198,13 @@ export default function RegisterPage() {
                   </div>
                 </div>
                 
-                <input type="text" placeholder="NAMA LENGKAP" value={nama} onChange={(e)=>setNama(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold outline-none" required />
+                <input type="text" placeholder="NAMA LENGKAP" value={nama} onChange={(e)=>setNama(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold outline-none uppercase" required />
+                
+                <div className="relative">
+                  <Hash className="absolute left-2 top-2.5 text-slate-400" size={12} />
+                  <input type="text" placeholder="NIP (NOMOR INDUK PEGAWAI)" value={nip} onChange={(e)=>setNip(e.target.value)} className="w-full p-2 pl-7 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold outline-none" required />
+                </div>
+
                 <input type="email" placeholder="EMAIL" value={email} onChange={(e)=>setEmail(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded text-[10px] font-bold outline-none" required />
                 
                 <div className="relative">
@@ -281,7 +286,8 @@ export default function RegisterPage() {
                           </div>
 
                           <div className="space-y-1.5 flex-1 max-w-sm">
-                            <input value={editNama} onChange={(e)=>setEditNama(e.target.value)} className="w-full p-1.5 border border-blue-400 rounded text-[10px] font-bold outline-none" placeholder="Nama Lengkap" />
+                            <input value={editNama} onChange={(e)=>setEditNama(e.target.value)} className="w-full p-1.5 border border-blue-400 rounded text-[10px] font-bold outline-none uppercase" placeholder="Nama Lengkap" />
+                            <input value={editNip} onChange={(e)=>setEditNip(e.target.value)} className="w-full p-1.5 border border-blue-400 rounded text-[10px] font-bold outline-none" placeholder="NIP" />
                             <input value={editEmail} onChange={(e)=>setEditEmail(e.target.value)} className="w-full p-1.5 border border-blue-400 rounded text-[10px] font-bold outline-none" placeholder="Email" />
                             
                             <div className="relative">
@@ -305,7 +311,8 @@ export default function RegisterPage() {
                           </div>
                           <div>
                             <p className="text-[11px] font-black uppercase text-slate-800 leading-tight">{p.nama_lengkap}</p>
-                            <p className="text-[9px] text-slate-400 font-bold mt-0.5">{p.email}</p>
+                            <p className="text-[9px] text-blue-600 font-bold mt-0.5">NIP: {p.nip || '-'}</p>
+                            <p className="text-[8px] text-slate-400 font-bold">{p.email}</p>
                           </div>
                         </div>
                       )}
@@ -327,7 +334,7 @@ export default function RegisterPage() {
                           <>
                             <button 
                               onClick={()=>{
-                                setEditId(p.id); setEditNama(p.nama_lengkap); setEditEmail(p.email || ""); setEditRole(p.role); setEditAvatar(p.avatar_url || ""); setEditKdSkpd(p.kd_skpd || "");
+                                setEditId(p.id); setEditNama(p.nama_lengkap); setEditNip(p.nip || ""); setEditEmail(p.email || ""); setEditRole(p.role); setEditAvatar(p.avatar_url || ""); setEditKdSkpd(p.kd_skpd || "");
                               }} 
                               className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"
                             >
