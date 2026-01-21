@@ -2,7 +2,9 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { 
-  LayoutDashboard, ChevronRight, Folder, List, MessageSquare, AlertCircle, Loader2, Filter, CheckCircle2, XCircle 
+  LayoutDashboard, ChevronRight, Folder, List, MessageSquare, 
+  AlertCircle, Loader2, Filter, CheckCircle2, XCircle, Megaphone, 
+  FileText, Download, Eye, X, ChevronUp 
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -14,6 +16,10 @@ export default function DashboardPage() {
   const [expandedSkpd, setExpandedSkpd] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  
+  // State untuk Pengumuman & Preview
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [previewId, setPreviewId] = useState<string | null>(null);
 
   const fetchUsulanAndAsistensi = useCallback(async (userProfile: any, statusFilter: string) => {
     if (!statusFilter || !userProfile) return;
@@ -21,12 +27,8 @@ export default function DashboardPage() {
     try {
       const filterValue = String(statusFilter).trim();
       
-      // 1. Ambil data usulan tanpa join untuk menghindari error relasi
-      let queryUsulan = supabase
-        .from("usulan")
-        .select(`*`) 
-        .eq("status_anggaran", filterValue);
-
+      // 1. Ambil data usulan
+      let queryUsulan = supabase.from("usulan").select(`*`).eq("status_anggaran", filterValue);
       if (userProfile.role === "SKPD (OPD)") {
         queryUsulan = queryUsulan.eq("kd_skpd", userProfile.kd_skpd);
       }
@@ -34,18 +36,23 @@ export default function DashboardPage() {
       const { data: usulanData, error: uErr } = await queryUsulan;
       if (uErr) throw uErr;
 
-      if (usulanData && usulanData.length > 0) {
-        // 2. Ambil referensi nama SKPD secara terpisah dari tabel skpd
-        const { data: skpdData } = await supabase.from("skpd").select("kode, nama");
+      // 2. Ambil Daftar Pengumuman (Hanya yang is_visible: true)
+      const { data: annData } = await supabase
+        .from("announcements")
+        .select("*")
+        .eq("status_anggaran", filterValue)
+        .eq("is_visible", true)
+        .order("created_at", { ascending: false });
+      setAnnouncements(annData || []);
 
-        // 3. Ambil data asistensi
+      if (usulanData && usulanData.length > 0) {
+        const { data: skpdData } = await supabase.from("skpd").select("kode, nama");
         const usulanIds = usulanData.map(u => u.id);
         const { data: asistensiData } = await supabase
           .from("asistensi")
           .select("usulan_id, rekomendasi")
           .in("usulan_id", usulanIds);
 
-        // 4. Gabungkan data secara manual di frontend
         const mergedData = usulanData.map(u => {
           const infoSkpd = skpdData?.find(s => s.kode === u.kd_skpd);
           return {
@@ -67,7 +74,6 @@ export default function DashboardPage() {
         setStats({ totalUsulan: 0, disetujui: 0, ditolak: 0, totalAnggaran: 0 });
       }
     } catch (err: any) {
-      console.error("Fetch error:", err);
       setErrorMsg("Gagal memuat data: " + err.message);
     }
   }, []);
@@ -102,6 +108,120 @@ export default function DashboardPage() {
       fetchUsulanAndAsistensi(profile, selectedStatus);
     }
   }, [selectedStatus, profile, fetchUsulanAndAsistensi]);
+
+  // Fungsi Download File
+  const handleDownload = async (url: string, fileName: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const link = document.createElement("a");
+      link.href = window.URL.createObjectURL(blob);
+      link.download = `PENGUMUMAN_${fileName.replace(/\//g, '_')}.pdf`;
+      link.click();
+    } catch (error) {
+      alert("Gagal mengunduh file.");
+    }
+  };
+
+  // Fungsi Render Tabel Pengumuman
+  const renderAnnouncementTable = () => {
+    return (
+      <div className="mb-10 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-4 bg-orange-50 flex items-center gap-2 font-black text-xs text-orange-700 uppercase tracking-widest border-b border-orange-100">
+          <Megaphone size={18} />
+          Daftar Pengumuman Tahap {selectedStatus}
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase border-b">
+              <tr>
+                <th className="px-6 py-4 w-[25%]">Nomor & Tanggal</th>
+                <th className="px-6 py-4 w-[55%]">Narasi Pengumuman</th>
+                <th className="px-6 py-4 text-center w-[20%]">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {announcements.length === 0 ? (
+                <tr><td colSpan={3} className="p-10 text-center text-xs text-slate-400 italic font-bold uppercase">Belum ada pengumuman untuk tahap ini</td></tr>
+              ) : (
+                announcements.map((ann, idx) => (
+                  <React.Fragment key={ann.id || idx}>
+                    <tr className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4 align-top">
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-black text-slate-800 tracking-tighter uppercase leading-none">{ann.nomor_pengumuman}</span>
+                          <span className="text-[9px] font-bold text-slate-400 mt-2 flex items-center gap-1 uppercase">
+                            <Calendar size={10} /> {new Date(ann.tanggal).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 align-top">
+                        <p className="text-xs font-bold text-slate-600 leading-relaxed uppercase italic">
+                          {ann.narasi}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4 align-top">
+                        <div className="flex justify-center items-center gap-2">
+                          {ann.file_url ? (
+                            <>
+                              {/* Tombol Preview */}
+                              <button 
+                                onClick={() => setPreviewId(previewId === ann.id ? null : ann.id)}
+                                className={`flex items-center gap-1 px-3 py-2 rounded-lg text-[9px] font-black uppercase transition-all shadow-sm border ${
+                                  previewId === ann.id 
+                                  ? 'bg-orange-500 text-white border-orange-600' 
+                                  : 'bg-white text-orange-600 border-orange-200 hover:bg-orange-50'
+                                }`}
+                                title="Lihat PDF"
+                              >
+                                {previewId === ann.id ? <ChevronUp size={14} /> : <Eye size={14} />} PREVIEW
+                              </button>
+                              {/* Tombol Download */}
+                              <button 
+                                onClick={() => handleDownload(ann.file_url, ann.nomor_pengumuman)}
+                                className="inline-flex items-center gap-1 bg-white text-blue-600 border border-blue-200 px-3 py-2 rounded-lg text-[9px] font-black uppercase hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                                title="Unduh PDF"
+                              >
+                                <Download size={14} /> PDF
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-[9px] font-black text-slate-300 uppercase italic">Tanpa Lampiran</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Baris Iframe Preview */}
+                    {previewId === ann.id && (
+                      <tr>
+                        <td colSpan={3} className="p-4 bg-slate-50 border-b">
+                          <div className="relative bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+                            <div className="bg-slate-100 p-2 flex justify-between items-center border-b">
+                              <span className="text-[9px] font-black text-slate-500 uppercase flex items-center gap-2 px-2">
+                                <FileText size={12} /> Pratinjau Dokumen: {ann.nomor_pengumuman}
+                              </span>
+                              <button onClick={() => setPreviewId(null)} className="p-1 hover:bg-rose-500 hover:text-white rounded transition-colors">
+                                <X size={14} />
+                              </button>
+                            </div>
+                            <iframe 
+                              src={`${ann.file_url}#toolbar=0`} 
+                              className="w-full h-[500px]" 
+                              title="PDF Preview"
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
 
   const renderTableSection = (isApproved: boolean) => {
     const filtered = allUsulan.filter(d => isApproved ? d.tanggal_pengesahan !== null : d.tanggal_pengesahan === null);
@@ -171,9 +291,19 @@ export default function DashboardPage() {
     );
   };
 
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+      <div className="flex flex-col items-center gap-4">
+        <Loader2 className="animate-spin text-blue-600" size={40} />
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sinkronisasi Dashboard...</p>
+      </div>
+    </div>
+  );
+
   return (
     <div className="p-6 bg-[#F8FAFC] min-h-screen font-sans">
-      {/* HEADER DAN FILTER TETAP SAMA */}
+      
+      {/* HEADER DAN FILTER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-black text-slate-800 tracking-tighter uppercase flex items-center gap-2">
@@ -207,6 +337,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* RENDER TABEL PENGUMUMAN DENGAN PREVIEW */}
+      {renderAnnouncementTable()}
+
+      {/* RENDER TABEL USULAN */}
       {renderTableSection(true)}
       {renderTableSection(false)}
     </div>
@@ -221,4 +355,9 @@ function StatCard({ title, value, sub, color }: any) {
       <p className="text-2xl font-black mt-1 text-slate-900">{value} <span className="text-xs text-slate-300 font-bold uppercase">{sub}</span></p>
     </div>
   );
+}
+
+// Tambahan Icon Calendar
+function Calendar({ size }: { size: number }) {
+    return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>;
 }
