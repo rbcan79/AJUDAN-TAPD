@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { 
   LayoutDashboard, Users, Database, LogOut, 
-  Menu, ChevronLeft, Search, ClipboardCheck, Settings, BookOpen
+  Menu, ChevronLeft, Search, ClipboardCheck, Settings, BookOpen, Megaphone 
 } from "lucide-react";
 
 export default function Sidebar({ children }: { children: React.ReactNode }) {
@@ -66,6 +66,8 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
     { name: "USULAN KEGIATAN", path: "/usulan", icon: <Database size={18} />, roles: ["superadmin", "SKPD (OPD)"] },
     { name: "ASISTENSI TAPD", path: "/asistensi", icon: <ClipboardCheck size={18} />, roles: ["superadmin", "TAPD"] },
     { name: "PENGESAHAN USULAN", path: "/pengesahan", icon: <BookOpen size={18} />, roles: ["superadmin", "ADMIN"] },
+    // MENU BARU: BUAT PENGUMUMAN
+    { name: "BUAT PENGUMUMAN", path: "/pengumuman", icon: <Megaphone size={18} />, roles: ["superadmin", "ADMIN"] },
     { name: "KONFIGURASI ADMIN", path: "/admin", icon: <Settings size={18} />, roles: ["superadmin"] },
   ];
 
@@ -76,7 +78,6 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen w-full bg-[#f8fafc] overflow-hidden font-sans">
-      {/* SIDEBAR LEFT (NAVY) */}
       <aside className={`bg-[#002855] text-white transition-all duration-300 flex flex-col h-full shrink-0 shadow-2xl z-20 ${isCollapsed ? "w-20" : "w-64"}`}>
         <div className="p-4 border-b border-white/10 flex items-center justify-between bg-[#001e40] min-h-[73px]">
           {!isCollapsed && (
@@ -124,49 +125,27 @@ export default function Sidebar({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* RIGHT CONTENT AREA */}
       <main className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        {/* HEADER - DISAMAKAN DENGAN WARNA SIDEBAR (NAVY) */}
         <header className="h-[105px] bg-[#002855] border-b border-white/10 flex items-center justify-between px-8 shrink-0 shadow-xl z-10">
           <div className="flex items-center gap-6">
-            
-            {/* LOGO SJJGP DENGAN CONTAINER PUTIH (Tetap Putih agar Logo Jelas) */}
             <div className="h-20 w-auto bg-white p-1.5 rounded-xl shadow-lg shrink-0 flex items-center justify-center border border-white/20">
-              <img 
-                src="/sjjgp.png" 
-                alt="Logo Sijunjung Geopark" 
-                className="h-full w-auto object-contain"
-              />
+              <img src="/sjjgp.png" alt="Logo Sijunjung Geopark" className="h-full w-auto object-contain" />
             </div>
-            
             <div className="flex flex-col text-left">
-              {/* TEKS TAHUN ANGGARAN - SEKARANG WARNA PUTIH/CYAN AGAR KONTRAS */}
-              <h2 className="text-[20px] font-[1000] text-white tracking-tighter leading-none uppercase">
-                TAHUN ANGGARAN 2026
-              </h2>
-              {/* TEKS STATUS - WARNA BIRU MUDA/CYAN AGAR MENYALA */}
+              <h2 className="text-[20px] font-[1000] text-white tracking-tighter leading-none uppercase">TAHUN ANGGARAN 2026</h2>
               <p className="text-[12px] font-extrabold text-blue-400 uppercase mt-2 tracking-wider italic">
                 {statusAnggaran ? `● ${statusAnggaran}` : "● MEMUAT STATUS..."}
               </p>
             </div>
           </div>
-
-          {/* FASILITAS LOGO WANITA DI KANAN (TETAP ADA) */}
           <div className="flex flex-col items-center">
              <div className="w-14 h-14 rounded-full border-2 border-blue-400 overflow-hidden bg-white shadow-lg flex items-center justify-center">
-                <img 
-                  src="/ajudan-wanita1.png" 
-                  alt="Ajudan Wanita" 
-                  className="w-full h-full object-cover object-top"
-                />
+                <img src="/ajudan-wanita1.png" alt="Ajudan Wanita" className="w-full h-full object-cover object-top" />
              </div>
-             <span className="text-[11px] font-serif font-black italic tracking-tighter mt-1 leading-none text-blue-400 uppercase">
-                AJUDAN TAPD
-             </span>
+             <span className="text-[11px] font-serif font-black italic tracking-tighter mt-1 leading-none text-blue-400 uppercase">AJUDAN TAPD</span>
           </div>
         </header>
 
-        {/* CONTENT AREA */}
         <div className="flex-1 overflow-y-auto bg-[#f8fafc] p-8 scroll-smooth">
            {children}
         </div>
