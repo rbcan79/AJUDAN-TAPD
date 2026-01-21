@@ -129,7 +129,7 @@ export default function DashboardPage() {
       <div className="mb-10 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="p-4 bg-orange-50 flex items-center gap-2 font-black text-xs text-orange-700 uppercase tracking-widest border-b border-orange-100">
           <Megaphone size={18} />
-          Daftar Pengumuman Tahap {selectedStatus}
+          Daftar Pengumuman Kegiatan 
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
