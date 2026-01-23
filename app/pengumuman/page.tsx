@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { 
   Megaphone, Calendar, FileText, Upload, Save, 
   Trash2, Loader2, CheckCircle, X, ExternalLink, 
-  Eye, EyeOff, Download, ChevronDown, ChevronUp
+  Eye, EyeOff, Download, ChevronDown, ChevronUp, AlertCircle
 } from "lucide-react";
 
 export default function ManajemenPengumuman() {
@@ -14,7 +14,7 @@ export default function ManajemenPengumuman() {
   const [statusAnggaran, setStatusAnggaran] = useState("");
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [previewId, setPreviewId] = useState<string | null>(null); // State untuk pratinjau PDF
+  const [previewId, setPreviewId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     nomor: "",
@@ -72,7 +72,6 @@ export default function ManajemenPengumuman() {
     }
   };
 
-  // Fasilitas Download File
   const handleDownload = async (url: string, fileName: string) => {
     try {
       const response = await fetch(url);
@@ -97,7 +96,7 @@ export default function ManajemenPengumuman() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return alert("Pilih file PDF!");
+    if (!file) return alert("Silakan pilih berkas PDF terlebih dahulu!");
     setLoading(true);
 
     try {
@@ -121,12 +120,12 @@ export default function ManajemenPengumuman() {
 
       if (insertError) throw insertError;
       
-      alert("Pengumuman Terbit!");
+      alert("Pengumuman berhasil dipublikasikan!");
       setFormData({ ...formData, narasi: "" });
       setFile(null);
       fetchAnnouncements();
     } catch (error: any) {
-      alert("Gagal: " + error.message);
+      alert("Kesalahan: " + error.message);
     } finally {
       setLoading(false);
     }
@@ -143,9 +142,9 @@ export default function ManajemenPengumuman() {
       }
       const { error } = await supabase.from("announcements").delete().in("id", selectedIds);
       if (error) throw error;
-      alert("Data berhasil dihapus!");
+      alert("Berhasil dihapus!");
       fetchAnnouncements();
-    } catch (error: any) { alert("Gagal: " + error.message); }
+    } catch (error: any) { alert(error.message); }
     finally { setLoading(false); }
   };
 
@@ -161,139 +160,140 @@ export default function ManajemenPengumuman() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 p-4 md:p-8 font-sans">
-      <div className="max-w-6xl mx-auto space-y-10 text-black">
+    <div className="min-h-screen bg-slate-100 p-6 md:p-8 font-sans">
+      <div className="max-w-6xl mx-auto space-y-8">
         
         {/* SECTION 1: FORM INPUT */}
-        <section className="bg-white rounded-2xl shadow-xl overflow-hidden border-t-4 border-orange-500">
-          <div className="bg-[#002855] text-white p-6 flex items-center gap-4">
-            <Megaphone size={24} className="text-orange-400" />
-            <h1 className="text-lg font-black uppercase italic">Input Pengumuman Baru</h1>
+        <section className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-[#002855] text-white p-5 flex items-center gap-3">
+            <Megaphone size={20} className="text-orange-400" />
+            <h1 className="text-[13px] font-black uppercase tracking-wider italic">Input Pengumuman TAPD</h1>
           </div>
-          <form onSubmit={handleSubmit} className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+          <form onSubmit={handleSubmit} className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-black text-slate-500 uppercase">Nomor Dokumen</label>
-                <input type="text" readOnly value={formData.nomor} className="w-full p-4 bg-slate-50 border-2 rounded-xl font-bold text-black" />
+                <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Nomor Dokumen</label>
+                <input type="text" readOnly value={formData.nomor} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-800 text-[11px]" />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-500 uppercase">Tanggal</label>
-                <input type="date" required value={formData.tanggal} onChange={e => setFormData({...formData, tanggal: e.target.value})} className="w-full p-4 border-2 rounded-xl font-bold text-black focus:border-blue-500 outline-none" />
+                <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Tanggal Terbit</label>
+                <input type="date" required value={formData.tanggal} onChange={e => setFormData({...formData, tanggal: e.target.value})} className="w-full p-3 border border-slate-200 rounded-lg font-bold text-slate-800 text-[11px] outline-none focus:border-blue-500" />
               </div>
-              <div className="bg-blue-50 p-4 rounded-xl border-l-4 border-blue-500">
-                <p className="text-[9px] font-bold text-blue-500 uppercase">Status Anggaran Aktif</p>
-                <p className="text-lg font-black text-blue-900 uppercase italic">{statusAnggaran}</p>
+              <div className="bg-orange-50 p-4 rounded-lg border-l-4 border-orange-500">
+                <p className="text-[9px] font-black text-orange-600 uppercase">Tahap Anggaran Aktif</p>
+                <p className="text-[13px] font-black text-slate-800 uppercase italic">{statusAnggaran}</p>
               </div>
             </div>
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-black text-slate-500 uppercase">Narasi Pengumuman</label>
-                <textarea required rows={3} value={formData.narasi} onChange={e => setFormData({...formData, narasi: e.target.value})} className="w-full p-4 border-2 rounded-xl font-semibold text-black placeholder:text-slate-300" placeholder="Ketik narasi..." />
+                <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Narasi Singkat</label>
+                <textarea required rows={3} value={formData.narasi} onChange={e => setFormData({...formData, narasi: e.target.value})} className="w-full p-3 border border-slate-200 rounded-lg font-bold text-slate-800 text-[11px] placeholder:text-slate-300" placeholder="Ketik rincian pengumuman..." />
               </div>
               <div>
-                <label className="text-[10px] font-black text-slate-500 uppercase">Upload PDF</label>
-                <input type="file" accept=".pdf" onChange={e => setFile(e.target.files?.[0] || null)} className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-6 file:rounded-full file:border-0 file:text-xs file:font-black file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer" />
+                <label className="text-[10px] font-black text-slate-400 uppercase mb-1 block">Pilih Berkas PDF</label>
+                <input type="file" accept=".pdf" onChange={e => setFile(e.target.files?.[0] || null)} className="w-full text-[10px] text-slate-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-md file:border-0 file:text-[10px] file:font-black file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer" />
               </div>
-              <button type="submit" disabled={loading} className="w-full bg-[#002855] text-white p-5 rounded-2xl font-black uppercase tracking-[0.2em] italic flex justify-center items-center gap-3 hover:bg-blue-800 transition-all shadow-lg active:scale-95 disabled:bg-slate-300">
-                {loading ? <Loader2 className="animate-spin" /> : <Save size={20} />} TERBITKAN SEKARANG
+              <button type="submit" disabled={loading} className="w-full bg-[#002855] text-white p-3.5 rounded-lg font-black uppercase text-[10px] tracking-widest italic flex justify-center items-center gap-2 hover:bg-slate-800 transition-all shadow-md disabled:bg-slate-300">
+                {loading ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />} PUBLIKASIKAN SEKARANG
               </button>
             </div>
           </form>
         </section>
 
-        {/* SECTION 2: DAFTAR DATA DENGAN PREVIEW & DOWNLOAD */}
-        <section className="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
-          <div className="bg-slate-800 text-white p-6 flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <h2 className="text-sm font-black uppercase tracking-tighter flex items-center gap-2">
-                <FileText size={18} className="text-blue-400" /> Kontrol Dashboard User
-              </h2>
-              {selectedIds.length > 0 && (
-                <button onClick={handleBulkDelete} className="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase flex items-center gap-2">
-                  <Trash2 size={14} /> Hapus ({selectedIds.length})
-                </button>
-              )}
-            </div>
+        {/* SECTION 2: DAFTAR DATA */}
+        <section className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-slate-50 p-5 flex justify-between items-center border-b border-slate-200">
+            <h2 className="text-[11px] font-black uppercase text-slate-800 flex items-center gap-2">
+              <FileText size={16} className="text-blue-600" /> Riwayat Pengumuman
+            </h2>
+            {selectedIds.length > 0 && (
+              <button onClick={handleBulkDelete} className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 rounded-md text-[9px] font-black uppercase flex items-center gap-2 transition-all">
+                <Trash2 size={12} /> Hapus Massal ({selectedIds.length})
+              </button>
+            )}
           </div>
           
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left">
               <thead>
-                <tr className="bg-slate-50 border-b-2 border-slate-100">
-                  <th className="p-5 w-10 text-center">
-                    <input type="checkbox" onChange={handleSelectAll} checked={selectedIds.length === announcements.length && announcements.length > 0} className="w-5 h-5 accent-blue-600 cursor-pointer" />
+                <tr className="bg-slate-50 border-b border-slate-100">
+                  <th className="p-4 w-10 text-center">
+                    <input type="checkbox" onChange={handleSelectAll} checked={selectedIds.length === announcements.length && announcements.length > 0} className="w-4 h-4 accent-blue-600 cursor-pointer" />
                   </th>
-                  <th className="p-5 text-[10px] font-black text-slate-500 uppercase">Pengumuman</th>
-                  <th className="p-5 text-[10px] font-black text-slate-500 uppercase text-center">Status Tampil</th>
-                  <th className="p-5 text-[10px] font-black text-slate-500 uppercase text-center">Aksi</th>
+                  <th className="p-4 text-[9px] font-black text-slate-400 uppercase">Detail Pengumuman</th>
+                  <th className="p-4 text-[9px] font-black text-slate-400 uppercase text-center">Visibility</th>
+                  <th className="p-4 text-[9px] font-black text-slate-400 uppercase text-center">Kontrol</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {fetching ? (
-                  <tr><td colSpan={4} className="p-10 text-center text-slate-400 font-bold animate-pulse">Memuat data...</td></tr>
+                  <tr><td colSpan={4} className="p-10 text-center text-slate-300 text-[11px] font-black italic uppercase tracking-widest">Sinkronisasi Data...</td></tr>
+                ) : announcements.length === 0 ? (
+                  <tr><td colSpan={4} className="p-10 text-center text-slate-300 text-[11px] font-black italic uppercase tracking-widest">Data Kosong</td></tr>
                 ) : (
                   announcements.map((item) => (
                     <React.Fragment key={item.id}>
-                      <tr className={`hover:bg-blue-50/50 transition-all ${!item.is_visible ? 'bg-slate-50/50' : ''}`}>
-                        <td className="p-5 text-center">
-                          <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => handleSelectOne(item.id)} className="w-5 h-5 accent-blue-600 cursor-pointer" />
+                      <tr className={`hover:bg-slate-50/80 transition-all ${!item.is_visible ? 'bg-slate-50/50' : ''}`}>
+                        <td className="p-4 text-center">
+                          <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => handleSelectOne(item.id)} className="w-4 h-4 accent-blue-600 cursor-pointer" />
                         </td>
-                        <td className="p-5">
-                          <div className="flex flex-col">
-                            <span className="font-black text-slate-900 text-sm">{item.nomor_pengumuman}</span>
-                            <span className="text-[10px] font-bold text-slate-400">{new Date(item.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</span>
-                            <p className="text-xs text-slate-600 mt-1 italic line-clamp-1">{item.narasi}</p>
+                        <td className="p-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-black text-slate-800 text-[12px] uppercase">{item.nomor_pengumuman}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9px] font-black text-blue-500 uppercase flex items-center gap-1">
+                                <Calendar size={10} /> {new Date(item.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}
+                              </span>
+                              <span className="text-[9px] font-black text-slate-400 uppercase">| {item.status_anggaran}</span>
+                            </div>
+                            <p className="text-[11px] font-bold text-slate-500 mt-1 italic line-clamp-2 leading-relaxed whitespace-pre-line">{item.narasi}</p>
                           </div>
                         </td>
-                        <td className="p-5 text-center">
+                        <td className="p-4 text-center">
                           <button 
                             onClick={() => toggleVisibility(item.id, item.is_visible)}
-                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl transition-all ${
-                              item.is_visible ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'
-                            } font-black text-[10px] uppercase`}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all font-black text-[9px] uppercase ${
+                              item.is_visible ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'
+                            }`}
                           >
-                            {item.is_visible ? <Eye size={14} /> : <EyeOff size={14} />}
-                            {item.is_visible ? 'Aktif' : 'Sembunyi'}
+                            {item.is_visible ? <Eye size={12} /> : <EyeOff size={12} />}
+                            {item.is_visible ? 'Aktif' : 'Draft'}
                           </button>
                         </td>
-                        <td className="p-5">
+                        <td className="p-4">
                           <div className="flex justify-center items-center gap-2">
-                            {/* Tombol Preview */}
                             <button 
                               onClick={() => setPreviewId(previewId === item.id ? null : item.id)}
-                              className={`p-2.5 rounded-xl border transition-all ${previewId === item.id ? 'bg-orange-500 text-white border-orange-600' : 'bg-white text-orange-500 border-slate-200 hover:bg-orange-50'}`}
-                              title="Pratinjau PDF"
+                              className={`p-2 rounded-md transition-all border ${previewId === item.id ? 'bg-orange-500 text-white border-orange-600' : 'bg-white text-slate-400 border-slate-200 hover:border-orange-500 hover:text-orange-500'}`}
+                              title="Preview"
                             >
-                              {previewId === item.id ? <ChevronUp size={18} /> : <FileText size={18} />}
+                              {previewId === item.id ? <ChevronUp size={14} /> : <FileText size={14} />}
                             </button>
-                            {/* Tombol Download */}
                             <button 
                               onClick={() => handleDownload(item.file_url, item.nomor_pengumuman)}
-                              className="p-2.5 bg-white text-blue-600 border border-slate-200 rounded-xl hover:bg-blue-600 hover:text-white transition-all"
-                              title="Download PDF"
+                              className="p-2 bg-white text-slate-400 border border-slate-200 rounded-md hover:border-blue-500 hover:text-blue-500 transition-all"
+                              title="Download"
                             >
-                              <Download size={18} />
+                              <Download size={14} />
                             </button>
-                            {/* Tombol Hapus */}
-                            <button onClick={() => handleDeleteOne(item.id, item.file_url)} className="p-2.5 bg-white text-rose-500 border border-slate-200 rounded-xl hover:bg-rose-600 hover:text-white transition-all">
-                              <Trash2 size={18} />
+                            <button onClick={() => handleDeleteOne(item.id, item.file_url)} className="p-2 bg-white text-slate-400 border border-slate-200 rounded-md hover:border-rose-500 hover:text-rose-500 transition-all">
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </td>
                       </tr>
-                      {/* Baris Khusus Pratinjau PDF (Iframe) */}
                       {previewId === item.id && (
                         <tr>
-                          <td colSpan={4} className="p-4 bg-slate-100">
-                            <div className="bg-white rounded-2xl shadow-inner overflow-hidden border-2 border-slate-200">
-                              <div className="bg-slate-200 p-2 flex justify-between items-center">
-                                <span className="text-[10px] font-black uppercase text-slate-600 ml-2 italic">PDF Preview: {item.nomor_pengumuman}</span>
-                                <button onClick={() => setPreviewId(null)} className="p-1 hover:bg-rose-500 hover:text-white rounded-lg transition-all"><X size={16}/></button>
+                          <td colSpan={4} className="p-4 bg-slate-50">
+                            <div className="bg-white rounded-lg shadow-inner overflow-hidden border border-slate-200">
+                              <div className="bg-slate-800 p-2.5 flex justify-between items-center">
+                                <span className="text-[9px] font-black uppercase text-slate-300 ml-2 tracking-widest">Document Preview</span>
+                                <button onClick={() => setPreviewId(null)} className="p-1 text-slate-400 hover:text-white transition-all"><X size={16}/></button>
                               </div>
                               <iframe 
                                 src={`${item.file_url}#toolbar=0`} 
                                 className="w-full h-[500px]" 
-                                title="Preview PDF"
+                                title="PDF Preview"
                               />
                             </div>
                           </td>
