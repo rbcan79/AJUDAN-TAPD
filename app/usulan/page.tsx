@@ -22,7 +22,7 @@ export default function UsulanPage() {
   const [namaKegiatan, setNamaKegiatan] = useState("");
   const [narasi, setNarasi] = useState("");
   const [kdSkpd, setKdSkpd] = useState("");
-  const [namaSkpdUser, setNamaSkpdUser] = useState(""); // State baru untuk nama SKPD
+  const [namaSkpdUser, setNamaSkpdUser] = useState(""); 
   const [displayAnggaran, setDisplayAnggaran] = useState(""); 
   const [anggaran, setAnggaran] = useState(0);
 
@@ -44,21 +44,44 @@ export default function UsulanPage() {
     }).format(numberValue);
   };
 
+  // --- FUNGSI GENERATE NOMOR OTOMATIS ---
+  const generateNoOtomatis = useCallback(async (kodeSkpd: string, statusAnggaran: string) => {
+    if (!kodeSkpd || !statusAnggaran || isEditing) return;
+
+    try {
+      const { count, error } = await supabase
+        .from("usulan")
+        .select("*", { count: 'exact', head: true })
+        .eq("kd_skpd", kodeSkpd)
+        .eq("status_anggaran", statusAnggaran);
+
+      if (error) throw error;
+
+      const nextIndex = (count || 0) + 1;
+      const formattedIndex = String(nextIndex).padStart(3, '0');
+      const newNoUsulan = `${formattedIndex}/${kodeSkpd}/${statusAnggaran}`;
+      setNoUsulan(newNoUsulan);
+    } catch (err) {
+      console.error("Error generating auto-number:", err);
+    }
+  }, [isEditing]);
+
   const fetchData = useCallback(async () => {
     setFetching(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      // Ambil data SKPD terlebih dahulu untuk mencocokkan nama
       const { data: skpdData } = await supabase.from("skpd").select("kode, nama").order("kode", { ascending: true });
       if (skpdData) setListSkpd(skpdData);
 
       const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
+      let currentKdSkpd = "";
+
       if (profile) {
         setCurrentUser(profile);
         setKdSkpd(profile.kd_skpd);
-        // Cari nama SKPD user berdasarkan kode_skpd
+        currentKdSkpd = profile.kd_skpd;
         const userSkpd = skpdData?.find(s => s.kode === profile.kd_skpd);
         setNamaSkpdUser(userSkpd?.nama || "SKPD Tidak Teridentifikasi");
       }
@@ -69,6 +92,10 @@ export default function UsulanPage() {
       const activeSetting = settingsData?.find(s => s.is_locked === true);
       const activeStatus = activeSetting?.current_status_anggaran || "";
       setStatusAnggaranAktif(activeStatus);
+
+      if (currentKdSkpd && activeStatus) {
+        generateNoOtomatis(currentKdSkpd, activeStatus);
+      }
 
       if (activeStatus && profile) {
         let query = supabase
@@ -90,7 +117,7 @@ export default function UsulanPage() {
     } finally { 
         setFetching(false); 
     }
-  }, []);
+  }, [generateNoOtomatis]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -157,8 +184,9 @@ export default function UsulanPage() {
 
   const resetForm = () => {
     setIsEditing(false); setEditId(null);
-    setNoUsulan(""); setNamaKegiatan(""); setNarasi(""); setDisplayAnggaran("");
+    setNamaKegiatan(""); setNarasi(""); setDisplayAnggaran("");
     setFileSurat(""); setFileFoto(""); setFileRab("");
+    generateNoOtomatis(kdSkpd, statusAnggaranAktif);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -197,7 +225,7 @@ export default function UsulanPage() {
   return (
     <div className="p-4 bg-slate-50 min-h-screen text-[11px] font-sans text-slate-900">
       
-      {/* MODAL PREVIEW - DIPERBAIKI AGAR CHROME TIDAK BLOCK */}
+      {/* MODAL PREVIEW */}
       {previewUrl && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
           <div className="relative w-full max-w-5xl bg-white rounded-md h-[90vh] flex flex-col shadow-2xl">
@@ -206,7 +234,6 @@ export default function UsulanPage() {
               <button onClick={() => setPreviewUrl(null)} className="hover:text-red-400 transition-colors"><X size={20} /></button>
             </div>
             <div className="flex-1 bg-slate-200 relative">
-               {/* Atribut sandbox disesuaikan: menghapus pembatasan yang menyebabkan block di Chrome */}
                <iframe 
                 src={previewUrl} 
                 className="w-full h-full border-none" 
@@ -217,7 +244,7 @@ export default function UsulanPage() {
         </div>
       )}
 
-      {/* HEADER - DITAMBAHKAN NAMA SKPD USER */}
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 bg-white p-4 border border-slate-200 shadow-sm gap-4 rounded-sm">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-[#002855] text-white rounded-sm shadow-md flex items-center justify-center">
@@ -263,11 +290,22 @@ export default function UsulanPage() {
               <span className="opacity-70 tracking-widest text-[8px] border border-white/30 px-2 py-0.5 rounded-sm bg-white/10">{statusAnggaranAktif}</span>
             </div>
             <form onSubmit={handleSubmit} className="p-4 space-y-3">
-              <input placeholder="NOMOR USULAN" value={noUsulan} onChange={e => setNoUsulan(e.target.value)} className="w-full p-2 border border-slate-200 font-bold uppercase outline-none focus:border-blue-500 transition-all" required />
+              <div className="space-y-1">
+                {/* TEXT DITEBALKAN DISINI */}
+                <label className="text-[8px] font-extrabold text-slate-900 uppercase">Nomor Usulan (Otomatis)</label>
+                <input 
+                  placeholder="NOMOR USULAN" 
+                  value={noUsulan} 
+                  readOnly={!isEditing}
+                  className={`w-full p-2 border border-slate-200 font-bold uppercase outline-none focus:border-blue-500 transition-all ${!isEditing ? 'bg-slate-50 cursor-not-allowed text-slate-500' : 'bg-white'}`} 
+                  required 
+                />
+              </div>
               <input placeholder="NAMA KEGIATAN" value={namaKegiatan} onChange={e => setNamaKegiatan(e.target.value)} className="w-full p-2 border border-slate-200 font-bold uppercase outline-none focus:border-blue-500 transition-all" required />
               <textarea placeholder="NARASI USULAN" value={narasi} onChange={e => setNarasi(e.target.value)} className="w-full p-2 border border-slate-200 font-bold h-24 outline-none focus:border-blue-500 transition-all resize-none" required />
               <div className="space-y-1">
-                <label className="text-[8px] font-black text-slate-400 uppercase">Estimasi Anggaran (RAB)</label>
+                {/* TEXT DITEBALKAN DISINI */}
+                <label className="text-[8px] font-extrabold text-slate-900 uppercase">Estimasi Anggaran (RAB)</label>
                 <input type="text" value={displayAnggaran} onChange={(e) => setDisplayAnggaran(formatRupiah(e.target.value))} placeholder="Rp 0" className="w-full p-2 border border-slate-200 font-bold text-blue-700 bg-blue-50/30 outline-none" required />
               </div>
 
