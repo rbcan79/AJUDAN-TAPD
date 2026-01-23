@@ -92,10 +92,14 @@ export default function CekDataPage() {
         };
       }
       const check = asistensiList.find(a => a.usulan_id === u.id && a.user_id === tapdUserId);
-      let statusInfo = { label: "PENDING", color: "bg-slate-100 text-slate-400", Icon: Clock, catatan: "-" };
+      let statusInfo = { label: "BELUM ASISTENSI", color: "bg-slate-100 text-slate-400", borderColor: "ring-slate-200", Icon: Clock, catatan: "-" };
+      
       if (check) {
-        if (check.rekomendasi === "SETUJU") statusInfo = { label: "SETUJU", color: "bg-emerald-500 text-white", Icon: CheckCircle2, catatan: check.catatan };
-        else if (check.rekomendasi === "TOLAK") statusInfo = { label: "TOLAK", color: "bg-rose-500 text-white", Icon: XCircle, catatan: check.catatan };
+        if (check.rekomendasi === "SETUJU") {
+          statusInfo = { label: "SETUJU", color: "bg-emerald-500 text-white", borderColor: "ring-emerald-500", Icon: CheckCircle2, catatan: check.catatan };
+        } else if (check.rekomendasi === "TIDAK SETUJU") {
+          statusInfo = { label: "TIDAK SETUJU", color: "bg-rose-500 text-white", borderColor: "ring-rose-500", Icon: XCircle, catatan: check.catatan };
+        }
       }
       grouped[u.kd_skpd].items.push({ ...u, statusInfo });
     });
@@ -117,7 +121,7 @@ export default function CekDataPage() {
         return { 
           nama: t.nama_lengkap, 
           avatar: t.avatar_url,
-          rekomendasi: check ? check.rekomendasi : "PENDING",
+          rekomendasi: check ? check.rekomendasi : "BELUM ASISTENSI",
           catatan: check?.catatan || "Belum ada catatan."
         };
       });
@@ -136,8 +140,8 @@ export default function CekDataPage() {
   return (
     <div className="p-6 bg-slate-50 min-h-screen text-slate-900 font-sans">
       
-      {/* HEADER CONTROLS */}
-      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-6">
+      {/* HEADER CONTROLS - Diberikan z-index rendah agar tooltip bisa melayang di atasnya */}
+      <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-12 relative z-[1]">
         <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-[#002855] text-white rounded-2xl shadow-lg"><ShieldCheck size={24} /></div>
@@ -180,15 +184,15 @@ export default function CekDataPage() {
           {Object.keys(getUsulanGroupedData()).map((kd) => {
             const group = getUsulanGroupedData()[kd];
             return (
-              <div key={kd} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                <div onClick={() => toggleNode(kd)} className="p-4 bg-slate-50/50 flex items-center gap-3 cursor-pointer hover:bg-slate-100 border-b border-slate-100">
+              <div key={kd} className="bg-white rounded-2xl border border-slate-200 overflow-visible shadow-sm relative z-[10]">
+                <div onClick={() => toggleNode(kd)} className="p-4 bg-slate-50/50 flex items-center gap-3 cursor-pointer hover:bg-slate-100 border-b border-slate-100 rounded-t-2xl">
                   {expandedNodes.includes(kd) ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                   <Building2 size={16} className="text-indigo-600" />
                   <span className="text-[11px] font-black uppercase text-slate-700">{kd} - {group.namaSkpd}</span>
                 </div>
 
                 {expandedNodes.includes(kd) && (
-                  <div className="overflow-x-auto p-4">
+                  <div className="overflow-visible p-4">
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="text-[8px] font-black text-slate-400 uppercase border-b border-slate-100 bg-slate-50/30">
@@ -201,38 +205,32 @@ export default function CekDataPage() {
                         {group.items.map((u: any) => (
                           <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="px-4 py-4 text-[10px] font-black text-slate-700 uppercase italic leading-tight">{u.nama_kegiatan}</td>
-                            {/* ANGGARAN HITAM DI TABEL USULAN */}
                             <td className="px-4 py-4 text-right text-[11px] font-black text-black whitespace-nowrap tracking-tight">
                               Rp {Number(u.anggaran).toLocaleString('id-ID')}
                             </td>
-                            <td className="px-4 py-4">
-                              <div className="flex justify-center -space-x-2">
+                            <td className="px-4 py-4 overflow-visible">
+                              <div className="flex justify-center -space-x-2 relative">
                                 {u.tapdStatus.map((t: any, idx: number) => (
-                                  <div key={idx} className="relative group">
-                                    <div className={`w-10 h-10 rounded-full border-2 bg-white overflow-hidden shadow-md transition-all group-hover:scale-110 z-10 ${
+                                  <div key={idx} className="relative group z-[20]">
+                                    <div className={`w-10 h-10 rounded-full border-2 bg-white overflow-hidden shadow-md transition-all group-hover:scale-110 group-hover:z-[30] ${
                                       t.rekomendasi === 'SETUJU' ? 'border-emerald-500' : 
-                                      t.rekomendasi === 'TOLAK' ? 'border-rose-500' : 
+                                      t.rekomendasi === 'TIDAK SETUJU' ? 'border-rose-500' : 
                                       'border-slate-200'
                                     }`}>
-                                      {t.avatar ? (
-                                        <img src={t.avatar} className="w-full h-full object-cover" alt={t.nama} />
-                                      ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400">
-                                          <User size={16} />
-                                        </div>
-                                      )}
+                                      {t.avatar ? <img src={t.avatar} className="w-full h-full object-cover" alt={t.nama} /> : <div className="w-full h-full flex items-center justify-center bg-slate-100 text-slate-400"><User size={16} /></div>}
                                     </div>
-                                    <div className="absolute bottom-full mb-4 left-1/2 -translate-x-1/2 hidden group-hover:block z-50 animate-in fade-in zoom-in duration-200">
-                                      <div className="bg-[#002855] text-white p-4 rounded-2xl shadow-2xl min-w-[280px] border border-white/10">
+                                    {/* TOOLTIP - z-index sangat tinggi agar muncul di paling atas */}
+                                    <div className="absolute bottom-full mb-6 left-1/2 -translate-x-1/2 hidden group-hover:block z-[9999] animate-in fade-in zoom-in duration-200">
+                                      <div className="bg-[#002855] text-white p-4 rounded-2xl shadow-2xl min-w-[280px] border border-white/20">
                                         <div className="flex items-center justify-between mb-2 border-b border-white/20 pb-2">
                                           <p className="text-[10px] font-black uppercase tracking-wider">{t.nama}</p>
-                                          <span className={`px-2 py-0.5 rounded text-[8px] font-black ${t.rekomendasi === 'SETUJU' ? 'bg-emerald-500' : t.rekomendasi === 'TOLAK' ? 'bg-rose-500' : 'bg-slate-500'}`}>
+                                          <span className={`px-2 py-0.5 rounded text-[8px] font-black ${t.rekomendasi === 'SETUJU' ? 'bg-emerald-500' : t.rekomendasi === 'TIDAK SETUJU' ? 'bg-rose-500' : 'bg-slate-500'}`}>
                                             {t.rekomendasi}
                                           </span>
                                         </div>
                                         <p className="text-[11px] font-bold leading-relaxed text-blue-50 italic">"{t.catatan}"</p>
                                       </div>
-                                      <div className="w-3 h-3 bg-[#002855] rotate-45 absolute -bottom-1.5 left-1/2 -translate-x-1/2"></div>
+                                      <div className="w-4 h-4 bg-[#002855] rotate-45 absolute -bottom-2 left-1/2 -translate-x-1/2"></div>
                                     </div>
                                   </div>
                                 ))}
@@ -256,22 +254,24 @@ export default function CekDataPage() {
           {tapdUsers.map((user) => {
             const groupedData = getTapdGroupedData(user.id);
             return (
-              <div key={user.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-                <div onClick={() => toggleNode(user.id)} className="p-4 flex items-center gap-4 cursor-pointer hover:bg-slate-50 border-b border-slate-100">
+              <div key={user.id} className="bg-white rounded-2xl border border-slate-200 overflow-visible shadow-sm relative z-[5]">
+                <div onClick={() => toggleNode(user.id)} className="p-4 flex items-center gap-4 cursor-pointer hover:bg-slate-50 border-b border-slate-100 rounded-t-2xl">
                   {expandedNodes.includes(user.id) ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
-                  <div className="w-12 h-12 bg-[#002855] rounded-xl overflow-hidden flex items-center justify-center shadow-md">
+                  
+                  <div className="w-14 h-14 bg-[#002855] rounded-xl overflow-hidden flex items-center justify-center shadow-md border-2 border-white ring-2 ring-slate-100">
                     {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : <span className="text-white text-sm font-black">{user.nama_lengkap.charAt(0)}</span>}
                   </div>
-                  <div>
-                    <h3 className="text-xs font-black uppercase text-slate-800">{user.nama_lengkap}</h3>
-                    <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-widest italic">Monitoring Hasil Asistensi</p>
+                  
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-[13px] font-black uppercase text-slate-800 break-words leading-tight">{user.nama_lengkap}</h3>
+                    <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-widest italic mt-1">Monitoring Hasil Asistensi Anggota</p>
                   </div>
                 </div>
 
                 {expandedNodes.includes(user.id) && (
-                  <div className="p-4 bg-slate-50/30 space-y-6">
+                  <div className="p-4 bg-slate-50/30 space-y-6 overflow-visible">
                     {Object.keys(groupedData).map((kd) => (
-                      <div key={kd} className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                      <div key={kd} className="bg-white border border-slate-200 rounded-2xl overflow-visible shadow-sm">
                         <div className="bg-slate-100/50 px-4 py-3 border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 flex items-center gap-2">
                           <Building2 size={12} className="text-indigo-400" /> {kd} - {groupedData[kd].namaSkpd}
                         </div>
@@ -279,26 +279,27 @@ export default function CekDataPage() {
                           <tbody className="divide-y divide-slate-100">
                             {groupedData[kd].items.map((u: any) => (
                               <tr key={u.id} className="hover:bg-indigo-50/10 transition-colors">
+                                <td className="px-5 py-5 w-16">
+                                   <div className={`w-12 h-12 rounded-xl overflow-hidden shadow-lg border-2 border-white ring-4 ${u.statusInfo.borderColor}`}>
+                                      {user.avatar_url ? <img src={user.avatar_url} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-slate-200 flex items-center justify-center text-slate-500 font-bold">{user.nama_lengkap.charAt(0)}</div>}
+                                   </div>
+                                </td>
                                 <td className="px-5 py-5">
                                   <p className="text-[10px] font-black text-slate-700 uppercase italic mb-3 leading-tight">{u.nama_kegiatan}</p>
-                                  
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {/* INFO ANGGARAN - WARNA HITAM */}
                                     <div className="bg-slate-100 border border-slate-200 p-3 rounded-xl flex items-center gap-3">
                                       <div className="p-1.5 bg-white text-black border border-slate-200 rounded-lg shadow-sm"><Wallet size={14} /></div>
                                       <div>
                                         <p className="text-[8px] font-black text-slate-500 uppercase tracking-tighter">Pagu Anggaran:</p>
-                                        <p className="text-[13px] font-black text-black tracking-tighter">
-                                          Rp {Number(u.anggaran).toLocaleString('id-ID')}
-                                        </p>
+                                        <p className="text-[13px] font-black text-black tracking-tighter">Rp {Number(u.anggaran).toLocaleString('id-ID')}</p>
                                       </div>
                                     </div>
 
-                                    {/* AREA CATATAN */}
-                                    <div className="bg-indigo-50/50 border border-indigo-100/50 p-3 rounded-xl flex items-start gap-3">
-                                      <div className="p-1.5 bg-indigo-100 text-indigo-500 rounded-lg"><MessageSquare size={14} /></div>
-                                      <div>
-                                        <p className="text-[8px] font-black text-indigo-400 uppercase tracking-tighter">Catatan Asistensi:</p>
+                                    <div className={`${u.statusInfo.label === 'BELUM ASISTENSI' ? 'bg-slate-100' : 'bg-indigo-50/50'} border border-slate-200 p-3 rounded-xl flex items-start gap-3`}>
+                                      <div className="p-1.5 bg-white text-indigo-500 rounded-lg shadow-sm"><MessageSquare size={14} /></div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="text-[9px] font-black text-[#002855] uppercase tracking-tighter border-b border-slate-200 pb-1 mb-1 break-words">{user.nama_lengkap}</p>
+                                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">Catatan Asistensi:</p>
                                         <p className="text-[11px] font-bold text-slate-600 leading-relaxed italic line-clamp-2 hover:line-clamp-none transition-all">
                                           {u.statusInfo.catatan}
                                         </p>
